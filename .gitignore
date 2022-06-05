@@ -1,0 +1,10 @@
+# Generados por Cargo
+debug/
+target/
+
+# IDE
+.idea/
+*.iml
+
+# Archivos consumidos
+*.csv
