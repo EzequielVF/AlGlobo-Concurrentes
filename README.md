@@ -1,1 +1,0 @@
-# AlGlobo---Concurrentes
