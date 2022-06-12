@@ -12,19 +12,28 @@ fn main() {
     let argumentos: Vec<String> = env::args().collect();
     let ruta = &argumentos[1];
 
-    match File::open(ruta) {
-        Ok(archivo_pagos) => {
-            let reader = BufReader::new(archivo_pagos);
-
-            for read_result in reader.lines() {
+    match abrir_archivo_paquetes(ruta) {
+        Ok(archivo) => {
+            for read_result in archivo.lines() {
                 match read_result {
                     Ok(line) => { println!("{}", line); }
-                    Err(_) => { println!("Ups...") }
+                    Err(e) => { eprintln!("Ups... {}", e) }
                 }
             }
         }
         Err(err) => {
-            eprintln!("Error: {}", err)
+            eprintln!("Error: {}", err);
+        }
+    }
+}
+
+fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Error> {
+    match File::open(ruta) {
+        Ok(archivo_pagos) => {
+            Ok(BufReader::new(archivo_pagos))
+        }
+        Err(err) => {
+            Err(err)
         }
     }
 }
