@@ -42,7 +42,7 @@ pub fn get_address() -> String {
 fn main() {
     let address = get_address();
     println!("Conectado a ... {}", &address);
-    let mut stream = TcpStream::connect(address).unwrap(); //Falta manejar el error
+    let mut stream = TcpStream::connect(address).expect("<CLIENTE>No me pude conectar al Banco!"); //Falta manejar el error
     loop {
         mandar_pago(&mut stream);
         leer_respuesta(&mut stream);

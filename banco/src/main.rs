@@ -4,9 +4,6 @@ use std::thread;
 use std::time::Duration;
 use rand::thread_rng;
 use rand::Rng;
-use tracing::Level;
-use tracing_appender::rolling::{RollingFileAppender, Rotation};
-
 
 static SERVER_ARGS: usize = 2;
 
@@ -51,17 +48,6 @@ fn main() {
     let address = get_address();
     println!("IP: {}", &address);
     println!("Esperando clientes...");
-
-    //Crate Log
-    let file_appender = RollingFileAppender::new(Rotation::NEVER, "", "file.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-    tracing_subscriber::fmt()
-        .with_writer(non_blocking)
-        .with_max_level(Level::TRACE)
-        .with_ansi(false)
-        .init();
-    //Crate Log
-
     wait_new_clients(&address);
 }
 
