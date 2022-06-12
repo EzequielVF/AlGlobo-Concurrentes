@@ -1,6 +1,7 @@
 use std::net::TcpStream;
 use std::io::Read;
 use std::io::Write;
+use std::process::exit;
 
 pub enum Message {
     Pay,
@@ -8,7 +9,7 @@ pub enum Message {
     Error,
     Unknown
 }
-
+// Fijarse si se puede usar un crate!
 impl From<u8> for Message {
     fn from(code: u8) -> Message {
         match code & 0xF0 {
@@ -58,14 +59,31 @@ fn push_to_buffer(buffer: &mut Vec<u8>, data: String) {
 
 pub fn mandar_pago(stream: &mut TcpStream) {
     //esto esta hardcodeado pero habria que pasar aca el mensaje que leemos del archivo
-    let cantidad_pago = String::from("500");
+    let cantidad_pago = String::from("Hola");
+
     let size = (cantidad_pago.len()+1) as u8;
     let buffer = [Message::Pay.into(), size]; //Me armo el buffer de aviso, primer byte tipo, segundo byte tamaño
-    stream.write_all(&buffer).unwrap(); //Aca le avise
+    match stream.write_all(&buffer) {
+        Ok(_) => {
+            println!("<Cliente> Mensaje enviado correctamente!");
+        }
+        Err(_) => {
+            println!("<Cliente> No me pude contactar con el banco!");
+            exit(0);
+        }
+    }
 
     let mut buffer_envio: Vec<u8> = Vec::with_capacity(size.into()); //Aca me armo el buffer con el contenido del mensaje, en este caso solo me meto los "500" que quiero pagar
     push_to_buffer(&mut buffer_envio, cantidad_pago);
-    stream.write(&buffer_envio).unwrap();
+    match stream.write(&buffer_envio) {
+        Ok(_) => {
+            println!("<Cliente> Mensaje enviado correctamente!");
+        }
+        Err(_) => {
+            println!("<Cliente> No me pude contactar con el banco!");
+            exit(0);
+        }
+    }
 }
 
 pub fn leer_respuesta(stream: &mut TcpStream) {
@@ -73,13 +91,13 @@ pub fn leer_respuesta(stream: &mut TcpStream) {
     let _aux = stream.read_exact(&mut num_buffer);
     match Message::from(num_buffer[0]) {
         Message::Succesfull => {
-            println!("\n<Cliente> Pago procesado correctamente!\n");
+            println!("<Cliente> Pago procesado correctamente!\n");
         }
         Message::Error => {
-            println!("\n<Cliente> No pudo procesarce el pago!\n");
+            println!("<Cliente> No pudo procesarce el pago!\n");
         }
         _ => {
-            println!("\nNo se que me contesto el server!\n");
+            println!("<Cliente>No se que me contesto el server!\n");
         }
     }
 }
