@@ -5,7 +5,6 @@ use std::time::Duration;
 use rand::thread_rng;
 use rand::Rng;
 
-
 static SERVER_ARGS: usize = 2;
 
 const DEFAULT_PORT: &str = "7666";
@@ -61,15 +60,10 @@ fn wait_new_clients(address: &str) -> std::io::Result<()> {
             .name("<<Cliente-Banco>>".into())
             .spawn(move || {
                 println!("Se lanzo un cliente!.");
-                handle_client(&mut client_stream);
+                read_packet_from_client(&mut client_stream);
             })
             .unwrap();
     }
-}
-
-fn handle_client(stream: &mut TcpStream) {
-    let mut stream_cloned = stream.try_clone().unwrap();
-    read_packet_from_client(&mut stream_cloned);
 }
 
 fn procesamiento_aleatorio() {
@@ -90,12 +84,26 @@ fn pago_es_correcto() -> bool {
 
 fn send_succesfull_message(stream: &mut TcpStream) {
     let buffer = [Message::Succesfull.into(), 0_u8];
-    stream.write_all(&buffer).unwrap();
+    match stream.write_all(&buffer){
+        Ok(_) => {
+            println!("<BANCO> Mensaje enviado correctamente!");
+        }
+        Err(_) => {
+            println!("<BANCO> Hubo un problema al intentar mandar un mensaje al cliente!")
+        }
+    }
 }
 
 fn send_error_message(stream: &mut TcpStream) {
     let buffer = [Message::Error.into(), 0_u8];
-    stream.write_all(&buffer).unwrap();
+    match stream.write_all(&buffer){
+        Ok(_) => {
+            println!("<BANCO> Mensaje enviado correctamente!");
+        }
+        Err(_) => {
+            println!("<BANCO> Hubo un problema al intentar mandar un mensaje al cliente!")
+        }
+    }
 }
 
 fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
@@ -129,11 +137,11 @@ fn read_packet_from_client(stream: &mut TcpStream) {
                         println!("<BANCO> Recibi un pago, voy a procesarlo!");
                         let aux = read_pay(buffer_packet);
                         if pago_es_correcto() {
-                            send_succesfull_message(stream);
                             println!("<BANCO> El Pago de {}$ fue recibido adecuadamente.", aux);
+                            send_succesfull_message(stream);
                         } else {
-                            send_error_message(stream);
                             println!("<BANCO> Tuvimos un problema al validar el pago de {}$.", aux);
+                            send_error_message(stream);
                         }
                     }
                     _ => {
@@ -142,7 +150,7 @@ fn read_packet_from_client(stream: &mut TcpStream) {
                 }
             }
             Err(_) => {
-                println!("El cliente se desconecto y cerro el stream.");
+                println!("<BANCO> El cliente se desconecto y cerro el stream.");
                 break;
             }
         }
