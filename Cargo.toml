@@ -4,7 +4,6 @@
 members = [
     "aerolinea",
     "banco",
-    "cliente_hardcodeado",
     "hotel",
     "procesador_pagos"
 ]
