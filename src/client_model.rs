@@ -46,37 +46,44 @@ pub fn run(ip:&str, port:&str) {
     //     leer_respuesta(&mut stream);
     // }
 
-
-
-
-
-}
-fn conectar_con_servidor(ip:&str, port:&str, tipo: String) -> Option<TcpStream>{
-    let address= format!("{}:{}", ip, port);
-    println!("<CLIENTE> Intentando establecer conexión con:  {}",address);
-    let mut stream = TcpStream::connect( address);
-    match stream {
-        Ok(tcp) => {
-            println!("<CLIENTE> Conexión exitosa, con {}", tipo);
-            Some(tcp)
+    match bank_channel {
+        Ok(bank) => {
+            let mut channel = bank;
+            loop {
+                enviar_pago_a_banco(&mut channel);
+            }
         }
         Err(_) => {
-            println!("<CLIENTE> No pude conectarme a {}!", tipo);
-            None
+
         }
     }
+
+
+
+}
+fn conectar_con_servidor(ip:&str, port:&str, tipo: String) -> Result<TcpStream, std::io::Error>{
+    let address= format!("{}:{}", ip, port);
+    println!("<CLIENTE> Intentando establecer conexión con:  {}",address);
+    let mut stream = TcpStream::connect( address)?;
+    Ok(stream)
 }
 
-fn enviar_pago_a_banco(stream: &mut TcpStream, paquete: PaqueteTuristico) {
-    let cantidad_pago = paquete.precio.to_string();
-
+//fn enviar_pago_a_banco(stream: &mut TcpStream, paquete: PaqueteTuristico)
+fn enviar_pago_a_banco(stream: &mut TcpStream) {
+    //let cantidad_pago = paquete.precio.to_string();
+    let cantidad_pago = String::from("500");
     let size = (cantidad_pago.len() + 1) as u8;
     let buffer = [Pay.into(), size]; // Me armo el buffer de aviso, primer byte tipo, segundo byte tamaño
     match stream.write_all(&buffer) {
-        Ok(_) => {
+        /*Ok(_) => {
             println!(
                 "<Cliente> Mensaje (id: {}) enviado correctamente!",
                 paquete.id
+            );
+        }*/ //Hardcodeado mientras que no haya archivo
+        Ok(_) => {
+            println!(
+                "<Cliente> Mensaje (id: 0) enviado correctamente!",
             );
         }
         Err(_) => {
@@ -88,10 +95,15 @@ fn enviar_pago_a_banco(stream: &mut TcpStream, paquete: PaqueteTuristico) {
     let mut buffer_envio: Vec<u8> = Vec::with_capacity(size.into()); // Aca me armo el buffer con el contenido del mensaje, en este caso solo me meto los "500" que quiero pagar
     push_to_buffer(&mut buffer_envio, cantidad_pago);
     match stream.write(&buffer_envio) {
-        Ok(_) => {
+        /*Ok(_) => {
             println!(
                 "<Cliente> Mensaje (id: {}) enviado correctamente!",
                 paquete.id
+            );
+        }*/
+        Ok(_) => {
+            println!(
+                "<Cliente> Mensaje (id: 0) enviado correctamente!",
             );
         }
         Err(_) => {
