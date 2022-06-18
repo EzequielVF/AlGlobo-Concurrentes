@@ -29,11 +29,11 @@ struct PaqueteTuristico {
 /// El procesamiento de cada pago se ejecuta concurrentemente ¿fork-join?
 pub fn run(ip:&str, port:&str) {
     // Conectar con aerolinea
-    conectar_con_servidor("127.0.0.1", "3000");
+    let mut airline_channel = conectar_con_servidor("127.0.0.1", "3000", String::from("Airline"));
     // Conectar con banco
-    conectar_con_servidor("127.0.0.1", "3001");
+    let bank_channel = conectar_con_servidor("127.0.0.1", "3001", String::from("Bank"));
     // Conectar con hotel
-    conectar_con_servidor("127.0.0.1", "3002");
+    let hotel_channel = conectar_con_servidor("127.0.0.1", "3002", String::from("Hotel"));
 
     // let argumentos: Vec<String> = env::args().collect();
     // let ruta = &argumentos[1];
@@ -45,14 +45,26 @@ pub fn run(ip:&str, port:&str) {
     //     enviar_pago_a_banco(&mut stream, paquetes_turistico);
     //     leer_respuesta(&mut stream);
     // }
+
+
+
+
+
 }
-fn conectar_con_servidor(ip:&str, port:&str){
+fn conectar_con_servidor(ip:&str, port:&str, tipo: String) -> Option<TcpStream>{
     let address= format!("{}:{}", ip, port);
     println!("<CLIENTE> Intentando establecer conexión con:  {}",address);
-    let mut stream = TcpStream::connect( address).expect(
-        "<CLIENTE> No me pude conectar");
-    println!("<CLIENTE> Conexión exitosa");
-    stream;
+    let mut stream = TcpStream::connect( address);
+    match stream {
+        Ok(tcp) => {
+            println!("<CLIENTE> Conexión exitosa, con {}", tipo);
+            Some(tcp)
+        }
+        Err(_) => {
+            println!("<CLIENTE> No pude conectarme a {}!", tipo);
+            None
+        }
+    }
 }
 
 fn enviar_pago_a_banco(stream: &mut TcpStream, paquete: PaqueteTuristico) {

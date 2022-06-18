@@ -29,7 +29,7 @@ fn wait_new_clients(address: &str) -> std::io::Result<()> {
         let connection: (TcpStream, SocketAddr) = listener.accept()?;
         let mut client_stream = connection.0;
         thread::Builder::new()
-            .name("<<Cliente-Banco>>".into())
+            .name("<<Cliente>>".into())
             .spawn(move || {
                 println!("Se lanzo un cliente!.");
                 read_packet_from_client(&mut client_stream);
