@@ -1,14 +1,14 @@
-pub use self::Message::{Error, Pay, Succesfull, Unknown};
+pub use self::Tipo::{Error, Pay, Succesfull, Unknown};
 
-pub enum Message {
+pub enum Tipo {
     Error,
     Pay,
     Succesfull,
     Unknown,
 }
 
-impl From<u8> for Message {
-    fn from(code: u8) -> Message {
+impl From<u8> for Tipo {
+    fn from(code: u8) -> Tipo {
         match code & 0xF0 {
             0x00 => Pay,
             0x10 => Succesfull,
@@ -18,8 +18,8 @@ impl From<u8> for Message {
     }
 }
 
-impl From<Message> for u8 {
-    fn from(code: Message) -> u8 {
+impl From<Tipo> for u8 {
+    fn from(code: Tipo) -> u8 {
         match code {
             Pay => 0x00,
             Succesfull => 0x10,

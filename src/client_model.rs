@@ -29,7 +29,7 @@ struct PaqueteTuristico {
 /// con formato "id,precio-paquete,aeropuerto-origen-aeropuerto-destino,nombre-hotel"
 ///
 /// El procesamiento de cada pago se ejecuta concurrentemente ¿fork-join?
-pub fn run(ip:&str, port:&str) {
+pub fn run(ip:&str) {
     // Conectar con aerolinea
     let mut airline_channel = conectar_con_servidor("127.0.0.1", "3000", String::from("Airline"));
     // Conectar con banco

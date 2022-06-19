@@ -27,5 +27,5 @@ name = "procesador_pagos"
 path = "src/procesador_pagos.rs"
 
 [[bin]]
-name = "prueba"
-path = "src/prueba.rs"
+name = "client"
+path = "src/client.rs"

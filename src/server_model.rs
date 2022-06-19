@@ -6,7 +6,7 @@ use std::time::Duration;
 use rand::thread_rng;
 use rand::Rng;
 
-use crate::comunicacion::Message::{Error, Pay, Succesfull};
+use crate::comunicacion::Tipo::{Error, Pay, Succesfull};
 
 static SERVER_ARGS: usize = 2;
 const ERROR: u8 = 1;
