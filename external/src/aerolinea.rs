@@ -1,12 +1,13 @@
-mod comunicacion;
+mod server;
+mod logger;
 
 const IP: &str = "127.0.0.1";
 const PORT: &str = "3000";
-const SERVICE_NAME: &str = "AEROLINEA";
+const SERVICE_NAME: &str = "aerolinea";
 
-use crate::comunicacion::run;
-
+use crate::server::Server;
 
 fn main() {
-    run(IP,PORT);
+    let server = Server::new(IP,PORT, SERVICE_NAME);
+    server.run();
 }
