@@ -1,7 +1,7 @@
 mod comunicacion;
-mod client_model;
+mod client;
 
-use crate::client_model::run;
+use crate::client::run;
 
 const IP: &str = "127.0.0.1";
 const CLIENT_NAME: &str = "PROCESADOR_PAGOS";

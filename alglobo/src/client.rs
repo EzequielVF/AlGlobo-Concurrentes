@@ -6,7 +6,7 @@ use actix::{Actor, Context, Handler, System, Message};
 use crate::comunicacion::Tipo;
 use crate::comunicacion::Tipo::{Error, Pay, Succesfull, Unknown};
 
-const FILE: &str = "src/archivo.csv";
+const FILE: &str = "alglobo/src/archivo.csv";
 
 fn conectar_con_servidor(ip:&str, port:&str, tipo: String) -> Result<TcpStream, std::io::Error>{
     let address= format!("{}:{}", ip, port);
@@ -66,13 +66,13 @@ impl Handler<Procesar> for Banco {
         match &self.stream {
             Ok(stream) => {
                 let mut channel = stream.try_clone().unwrap();
-                println!("Conectado exitosamente");
+                println!("<Cliente> Conexion estable...");
                 enviar_pago_a_banco(&mut channel, msg.0);
                 leer_respuesta(&mut stream.try_clone().unwrap());
                 true
             }
             Err(_) => {
-                println!("No me pude conectar!");
+                println!("<Cliente> La conexion no fue establecida!");
                 false
             }
         }
@@ -96,7 +96,7 @@ pub fn run(ip:&str) {
 
         let paquetes_turisticos = parsear_paquetes(FILE);
         for paquete in paquetes_turisticos {
-            let resp = banco_addr.do_send(Procesar(paquete));
+            let resp = banco_addr.send(Procesar(paquete)).await;
         }
 
         System::current().stop();
