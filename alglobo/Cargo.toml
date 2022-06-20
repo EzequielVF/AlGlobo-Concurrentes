@@ -13,7 +13,3 @@ actix-rt = "2.2"
 [[bin]]
 name = "procesador_pagos"
 path = "src/procesador_pagos.rs"
-
-[[bin]]
-name = "client"
-path = "src/client.rs"
