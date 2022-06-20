@@ -4,11 +4,17 @@ use actix::Actor;
 use actix_rt::System;
 use crate::comunicacion::Tipo;
 use crate::comunicacion::Tipo::{Error, Pay, Succesfull, Unknown};
-use crate::banco::Prueba;
-use crate::banco::Procesar;
+use crate::entity_actor::ConnectionStatus;
+use crate::entity_actor::ProcesarPaquete;
 
+const IP: &str = "127.0.0.1";
+const PORT_AEROLINEA: &str = "3000";
+const PORT_BANCO: &str = "3001";
+const PORT_HOTEL: &str = "3002";
 const FILE: &str = "alglobo/src/archivo.csv";
 
+
+#[derive(Clone)]
 pub struct PaqueteTuristico {
     pub id: u32,
     pub precio: u32,
@@ -16,16 +22,19 @@ pub struct PaqueteTuristico {
     pub hotel: String,
 }
 
-pub fn run(ip:&str) {
+pub fn run() {
 
     let system = System::new();
     system.block_on(async {
-        let banco_addr = crate::banco::Banco::new("127.0.0.1", "3001", String::from(FILE)).start();
-        let resp = banco_addr.send(Prueba()).await;
+        let banco_addr = crate::entity_actor::EntityActor::new(IP, PORT_BANCO, String::from(FILE)).start();
+        let aerolinea_addr = crate::entity_actor::EntityActor::new(IP, PORT_AEROLINEA, String::from(FILE)).start();
+        let hotel_addr = crate::entity_actor::EntityActor::new(IP, PORT_HOTEL, String::from(FILE)).start();
 
         let paquetes_turisticos = parsear_paquetes(FILE);
         for paquete in paquetes_turisticos {
-            let resp = banco_addr.send(Procesar(paquete)).await;
+            let resp = banco_addr.do_send(ProcesarPaquete(paquete.clone()));
+            let resp = aerolinea_addr.do_send(ProcesarPaquete(paquete.clone()));
+            let resp = hotel_addr.do_send(ProcesarPaquete(paquete.clone()));
         }
 
         System::current().stop();
