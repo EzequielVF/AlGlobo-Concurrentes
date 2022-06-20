@@ -1,31 +1,7 @@
-[package]
-name = "al-globo"
-version = "0.1.0"
-edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-rand = "0.7"
-actix = "0.11.0"
-actix-rt = "2.2"
-
-[[bin]]
-name = "aerolinea"
-path = "src/aerolinea.rs"
-
-[[bin]]
-name = "banco"
-path = "src/banco.rs"
-
-[[bin]]
-name = "hotel"
-path = "src/hotel.rs"
-
-[[bin]]
-name = "procesador_pagos"
-path = "src/procesador_pagos.rs"
-
-[[bin]]
-name = "client"
-path = "src/client.rs"
+[workspace]
+members = [
+    "alglobo",
+    "external"
+]

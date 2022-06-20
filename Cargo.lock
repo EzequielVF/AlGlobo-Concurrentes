@@ -59,7 +59,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "al-globo"
+name = "alglobo"
 version = "0.1.0"
 dependencies = [
  "actix",
@@ -109,6 +109,13 @@ checksum = "8ff1f980957787286a554052d03c7aee98d99cc32e09f6d45f0a814133c87978"
 dependencies = [
  "cfg-if",
  "once_cell",
+]
+
+[[package]]
+name = "external"
+version = "0.1.0"
+dependencies = [
+ "rand",
 ]
 
 [[package]]

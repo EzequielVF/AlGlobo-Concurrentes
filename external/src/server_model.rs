@@ -39,8 +39,8 @@ fn wait_new_clients(address: &str) -> std::io::Result<()> {
 }
 
 fn procesamiento_aleatorio() {
-    const FACTOR_TEMPORAL: u64 = 3;
-    let ms = thread_rng().gen_range(100, 300);
+    const FACTOR_TEMPORAL: u64 = 1;
+    let ms = thread_rng().gen_range(1000, 3000);
     thread::sleep(Duration::from_millis(ms * FACTOR_TEMPORAL));
 }
 

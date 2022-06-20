@@ -4,10 +4,10 @@ use std::io::{BufRead, BufReader};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
-use crate::comunicacion::Message;
-use crate::comunicacion::Message::{Error, Pay, Succesfull};
+use crate::comunicacion::Tipo;
+use crate::comunicacion::Tipo::{Error, Pay, Succesfull};
 
-const DEFAULT: &str = "src/archivo.csv";
+const DEFAULT: &str = "alglobo/src/archivo.csv";
 
 fn push_to_buffer(buffer: &mut Vec<u8>, data: String) {
     buffer.push(data.len() as u8);
@@ -101,7 +101,7 @@ fn enviar_pago_a_banco(stream: &mut TcpStream, paquete: PaqueteTuristico) {
 pub fn leer_respuesta(stream: &mut TcpStream) {
     let mut num_buffer = [0u8; 2];
     let _aux = stream.read_exact(&mut num_buffer);
-    match Message::from(num_buffer[0]) {
+    match Tipo::from(num_buffer[0]) {
         Succesfull => {
             println!("<Cliente> Pago procesado correctamente!\n");
         }

@@ -96,7 +96,7 @@ pub fn run(ip:&str) {
 
         let paquetes_turisticos = parsear_paquetes(FILE);
         for paquete in paquetes_turisticos {
-            let resp = banco_addr.send(Procesar(paquete)).await;
+            let resp = banco_addr.do_send(Procesar(paquete));
         }
 
         System::current().stop();
