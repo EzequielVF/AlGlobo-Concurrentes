@@ -57,7 +57,7 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                 let mut buffer_packet: Vec<u8> = vec![0; size as usize]; //Me creo un contenedor del tamaño q me dijeron
                 let _aux = stream.read_exact(&mut buffer_packet); //Leo lo que me dijeron que lea
                 match message_type {
-                    Pay => {
+                    Tipo::Pay => {
                         {
                             logger.lock().unwrap().log("<SERVER> Recibi un pago, voy a procesarlo!");
                         }
@@ -87,7 +87,7 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
 }
 
 fn procesamiento_aleatorio() {
-    const FACTOR_TEMPORAL: u64 = 5;
+    const FACTOR_TEMPORAL: u64 = 1;
     let ms = thread_rng().gen_range(1000, 3000);
     thread::sleep(Duration::from_millis(ms * FACTOR_TEMPORAL));
 }

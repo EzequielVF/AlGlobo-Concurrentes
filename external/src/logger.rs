@@ -2,6 +2,7 @@ use std::fmt::format;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::time::{Duration, SystemTime};
+use chrono::Local;
 
 pub struct Logger {
     file: File,
@@ -14,6 +15,7 @@ impl Logger {
         let log_file = OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)//si no queremos que borre sino que sume a lo que tiene lo remplazamos por .append(true)
             .open(filename)
             .expect("Error creando archivo de log");
 
@@ -23,7 +25,7 @@ impl Logger {
     }
 
     pub fn log(&mut self, detalle: &str) {
-        let tiempo = "2022;07;01";
+        let tiempo = Local::now().to_string();
         let mensaje = format!("[{}] - {}\n", tiempo, detalle);
 
         self.file.write_all(mensaje.as_bytes())

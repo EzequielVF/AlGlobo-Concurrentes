@@ -32,12 +32,12 @@ pub fn run() {
 
         let paquetes_turisticos = parsear_paquetes(FILE);
         for paquete in paquetes_turisticos {
-            let resp = banco_addr.send(ProcesarPaquete(paquete.clone()));
-            let resp = aerolinea_addr.send(ProcesarPaquete(paquete.clone()));
-            let resp = hotel_addr.send(ProcesarPaquete(paquete.clone()));
+            let resp = banco_addr.send(ProcesarPaquete(paquete.clone())).await;
+            let resp = aerolinea_addr.send(ProcesarPaquete(paquete.clone())).await;
+            let resp = hotel_addr.send(ProcesarPaquete(paquete.clone())).await;
         }
 
-        System::current().stop();
+        //System::current().stop();
     });
     system.run();
 }
