@@ -13,36 +13,24 @@ pub use self::Tipo::{Error, Pay, Succesfull, Unknown};
 static SERVER_ARGS: usize = 2;
 const ERROR: u8 = 1;
 
-//#[derive(Copy, Clone)]
-pub struct Server {
-    address: String,
-    logger: Arc<Mutex<Logger>>,
-}
-
-impl Server {
-    pub fn new(ip: &str, port: &str, nombre: &str) -> Self {
-        Server {
-            address: format!("{}:{}", ip, port),
-            logger: Arc::new(Mutex::new(Logger::new(String::from(nombre)))),
-        }
+pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
+    let address = format!("{}:{}", ip, port);
+    let logger = Arc::new(Mutex::new(Logger::new(String::from(nombre))));
+    {
+        logger.lock().unwrap().log(format!("Esperando clientes en: {}", address).as_str());
     }
-
-    pub fn run(&self) -> std::io::Result<()> {
-        self.logger.lock().unwrap().log(format!("Esperando clientes en: {}", self.address).as_str());
-
-        loop {
-            let listener = TcpListener::bind(&self.address)?;
-            let connection: (TcpStream, SocketAddr) = listener.accept()?;
-            let mut client_stream = connection.0;
-            let logger_clon = self.logger.clone();
-            thread::Builder::new()
-                .name("<<Cliente>>".into())
-                .spawn(move || {
-                    println!("Se lanzo un cliente!.");
-                    read_packet_from_client(&mut client_stream, logger_clon);
-                })
-                .unwrap();
-        }
+    loop {
+        let listener = TcpListener::bind(&address)?;
+        let connection: (TcpStream, SocketAddr) = listener.accept()?;
+        let mut client_stream = connection.0;
+        let logger_clon = logger.clone();
+        thread::Builder::new()
+            .name("<<Cliente>>".into())
+            .spawn(move || {
+                println!("Se lanzo un cliente!.");
+                read_packet_from_client(&mut client_stream, logger_clon);
+            })
+            .unwrap();
     }
 }
 

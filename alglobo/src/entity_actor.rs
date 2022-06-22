@@ -56,7 +56,7 @@ impl Handler<ProcesarPaquete> for EntityActor {
             Ok(stream) => {
                 let mut channel = stream.try_clone().unwrap();
                 enviar_paquete(&mut channel, msg.0);
-                leer_respuesta(&mut stream.try_clone().unwrap());
+                //leer_respuesta(&mut stream.try_clone().unwrap());
                 true
             }
             Err(_) => {
