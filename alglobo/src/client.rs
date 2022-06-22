@@ -1,18 +1,15 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use actix::Actor;
-use actix_rt::System;
+use actix_rt::{Arbiter, System};
 use crate::comunicacion::Tipo;
 use crate::comunicacion::Tipo::{Error, Pay, Succesfull, Unknown};
 use crate::entity_actor::ConnectionStatus;
-use crate::entity_actor::ProcesarPaquete;
+use crate::procesador_pagos::Procesar;
+use crate::procesador_pagos::ProcesadorPagos;
 
 const IP: &str = "127.0.0.1";
-const PORT_AEROLINEA: &str = "3000";
-const PORT_BANCO: &str = "3001";
-const PORT_HOTEL: &str = "3002";
 const FILE: &str = "alglobo/src/archivo.csv";
-
 
 #[derive(Clone)]
 pub struct PaqueteTuristico {
@@ -25,19 +22,20 @@ pub struct PaqueteTuristico {
 pub fn run() {
 
     let system = System::new();
+    let mut vec = vec!();
+    let paquetes_turisticos = parsear_paquetes(FILE); //ver de hacer un lector async o convertirlo en actor
     system.block_on(async {
-        let banco_addr = crate::entity_actor::EntityActor::new(IP, PORT_BANCO, String::from(FILE)).start();
-        let aerolinea_addr = crate::entity_actor::EntityActor::new(IP, PORT_AEROLINEA, String::from(FILE)).start();
-        let hotel_addr = crate::entity_actor::EntityActor::new(IP, PORT_HOTEL, String::from(FILE)).start();
-
-        let paquetes_turisticos = parsear_paquetes(FILE);
+        let addr_pp = ProcesadorPagos::new(IP).start();
         for paquete in paquetes_turisticos {
-            let resp = banco_addr.send(ProcesarPaquete(paquete.clone())).await;
-            let resp = aerolinea_addr.send(ProcesarPaquete(paquete.clone())).await;
-            let resp = hotel_addr.send(ProcesarPaquete(paquete.clone())).await;
+            vec.push(addr_pp.send(Procesar(paquete)));
         }
+    });
 
-        //System::current().stop();
+    system.block_on(async {
+       for x in vec {
+           x.await; // esperamos la respuesta del PP
+       }
+        System::current().stop();
     });
     system.run();
 }

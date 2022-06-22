@@ -11,5 +11,5 @@ actix = "0.11.0"
 actix-rt = "2.2"
 
 [[bin]]
-name = "procesador_pagos"
-path = "src/procesador_pagos.rs"
+name = "main"
+path = "src/main.rs"

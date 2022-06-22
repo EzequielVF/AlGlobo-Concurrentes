@@ -1,8 +1,6 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
-
 use actix::{Actor, Context, Handler, Message, System};
-
 use crate::client::PaqueteTuristico;
 use crate::comunicacion::{conectar_con_servidor, enviar_paquete, leer_respuesta, Pay, Tipo};
 
