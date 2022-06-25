@@ -32,8 +32,6 @@ impl ProcesadorPagos {
     }
 }
 
-#[derive(Message)]
-#[rtype(result = "bool")]
 pub struct Procesar(pub PaqueteTuristico);
 
 impl Handler<Procesar> for ProcesadorPagos {
