@@ -1,12 +1,14 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+
 use actix::Actor;
 use actix_rt::{Arbiter, System};
+
 use crate::comunicacion::Tipo;
 use crate::comunicacion::Tipo::{Error, Pay, Succesfull, Unknown};
 use crate::entity_actor::ConnectionStatus;
-use crate::procesador_pagos::Procesar;
 use crate::procesador_pagos::ProcesadorPagos;
+use crate::procesador_pagos::Procesar;
 
 const IP: &str = "127.0.0.1";
 const FILE: &str = "alglobo/src/archivo.csv";
@@ -20,7 +22,6 @@ pub struct PaqueteTuristico {
 }
 
 pub fn run() {
-
     let system = System::new();
     let mut vec = vec!();
     let paquetes_turisticos = parsear_paquetes(FILE); //ver de hacer un lector async o convertirlo en actor
@@ -32,13 +33,14 @@ pub fn run() {
     });
 
     system.block_on(async {
-       for x in vec {
-           x.await; // esperamos la respuesta del PP
-       }
+        for x in vec {
+            x.await; // esperamos la respuesta del PP
+        }
         System::current().stop();
     });
     system.run();
 }
+
 //Funciones auxiliareas despues capaz las movemos a otro lado!
 fn parsear_paquetes(ruta: &str) -> Vec<PaqueteTuristico> {
     let mut paquetes_turisticos: Vec<PaqueteTuristico> = Vec::new();

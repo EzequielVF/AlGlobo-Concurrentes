@@ -59,6 +59,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "actores"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "actix-rt",
+]
+
+[[package]]
 name = "alglobo"
 version = "0.1.0"
 dependencies = [
