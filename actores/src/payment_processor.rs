@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::sync::mpsc::Sender;
+
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
-use crate::external_entity::{EE_NewPayment, ExternalEntity};
+
 use crate::{Log, Logger};
+use crate::external_entity::{EE_NewPayment, ExternalEntity, TransactionResult, TransactionResultMessage};
 
 #[derive(Clone)]
 pub struct PaqueteTuristico {
@@ -56,8 +58,8 @@ impl Handler<PP_NewPayment> for PaymentProcessor {
     type Result = ();
 
     fn handle(&mut self, msg: PP_NewPayment, ctx: &mut Context<Self>) -> Self::Result {
-        self.bank_address.try_send(EE_NewPayment((msg.0).clone(), ctx.address().clone()));
         self.airline_address.try_send(EE_NewPayment((msg.0).clone(), ctx.address().clone()));
+        self.bank_address.try_send(EE_NewPayment((msg.0).clone(), ctx.address().clone()));
         self.hotel_address.try_send(EE_NewPayment((msg.0).clone(), ctx.address().clone()));
 
         self.entity_answers.insert(msg.0.id, HashMap::from([
@@ -78,14 +80,49 @@ impl Handler<EntityAnswer> for PaymentProcessor {
     type Result = ();
 
     fn handle(&mut self, msg: EntityAnswer, _ctx: &mut Context<Self>) -> Self::Result {
-        if let Some(transaction) = self.entity_answers.get_mut(&msg.1) {
+        let transaction_id = &msg.1;
+        if let Some(transaction) = self.entity_answers.get_mut(transaction_id) {
             transaction.insert(msg.0.clone(), msg.2.clone());
             &self.logger_address.try_send(Log(format!("[{}-ID:{}-Estado:{:?}]", msg.0, msg.1, msg.2)));
 
-            if transaction.iter().all(|(_name, state)| *state != RequestState::Sent) {
+            if transaction.iter().all(|(_n, state)| *state != RequestState::Sent) {
                 println!("[EntityAnswer] Recibí 3 respuestas");
                 transaction.iter()
                     .for_each(|(n, s)| println!("[Hash] Name: {} - State: {:?}", n, s));
+
+                if transaction.iter().all(|(_n, state)| *state == RequestState::Ok) {
+                    let transaction_result = TransactionResult {
+                        transaction_id: transaction_id.to_string(),
+                        result: true,
+                    };
+
+                    self.airline_address.try_send(TransactionResultMessage(transaction_result.clone()));
+                    self.bank_address.try_send(TransactionResultMessage(transaction_result.clone()));
+                    self.hotel_address.try_send(TransactionResultMessage(transaction_result.clone()));
+                } else {
+                    let transaction_result: TransactionResult = TransactionResult {
+                        transaction_id: transaction_id.to_string(),
+                        result: false,
+                    };
+                    for (service, state) in transaction.iter() {
+                        if *state == RequestState::Ok {
+                            match service.as_str() {
+                                "AIRLINE" => {
+                                    self.airline_address.try_send(TransactionResultMessage(transaction_result.clone()));
+                                }
+                                "BANK" => {
+                                    self.bank_address.try_send(TransactionResultMessage(transaction_result.clone()));
+                                }
+                                "HOTEL" => {
+                                    self.hotel_address.try_send(TransactionResultMessage(transaction_result.clone()));
+                                }
+                                _ => {
+                                    self.logger_address.try_send(Log(format!("No debería suceder esto")));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

@@ -7,6 +7,7 @@ use std::time::Duration;
 use rand::{Rng, thread_rng};
 
 use crate::logger::Logger;
+use crate::server::Tipo::{Commit, Rollback};
 
 pub use self::Tipo::{Error, Pay, Succesfull, Unknown};
 
@@ -45,11 +46,11 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                 let mut buffer_packet: Vec<u8> = vec![0; size as usize]; //Me creo un contenedor del tamaño q me dijeron
                 let _aux = stream.read_exact(&mut buffer_packet); //Leo lo que me dijeron que lea
                 match message_type {
-                    Tipo::Pay => {
+                    Pay => {
                         {
                             logger.lock().unwrap().log("<SERVER> Recibi un pago, voy a procesarlo!");
                         }
-                        let aux = read_pay(buffer_packet);
+                        let aux = read(buffer_packet);
                         if pago_es_correcto() {
                             println!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux);
                             send_succesfull_message(stream);
@@ -60,6 +61,14 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                             );
                             send_error_message(stream);
                         }
+                    }
+                    Commit => {
+                        let aux = read(buffer_packet);
+                        logger.lock().unwrap().log(format!("<SERVER> La operacion con ID:{} fue Commiteada",aux).as_str());
+                    }
+                    Rollback => {
+                        let aux = read(buffer_packet);
+                        logger.lock().unwrap().log(format!("<SERVER> La operacion con ID:{} fue RollBackeada!",aux).as_str());
                     }
                     _ => {
                         println!("<SERVER> Mensaje desconocido");
@@ -121,7 +130,7 @@ fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
     }
 }
 
-fn read_pay(buffer_packet: Vec<u8>) -> String {
+fn read(buffer_packet: Vec<u8>) -> String {
     let mut _index = 0_usize;
 
     let pago_size: usize = buffer_packet[(_index) as usize] as usize; //esto es asi porque los string en su primer byte tiene el tamaño, seguido del contenido
@@ -134,6 +143,8 @@ pub enum Tipo {
     Error,
     Pay,
     Succesfull,
+    Commit,
+    Rollback,
     Unknown,
 }
 
@@ -143,6 +154,8 @@ impl From<u8> for Tipo {
             0x00 => Pay,
             0x10 => Succesfull,
             0x20 => Error,
+            0x30 => Commit,
+            0x40 => Rollback,
             _ => Unknown,
         }
     }
@@ -154,6 +167,8 @@ impl From<Tipo> for u8 {
             Pay => 0x00,
             Succesfull => 0x10,
             Error => 0x20,
+            Commit => 0x30,
+            Rollback => 0x40,
             _ => 0x99,
         }
     }

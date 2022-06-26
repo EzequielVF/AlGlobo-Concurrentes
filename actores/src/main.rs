@@ -22,7 +22,8 @@ const PORT_BANCO: &str = "3001";
 const PORT_HOTEL: &str = "3002";
 const IP: &str = "127.0.0.1";
 
-const LOG_FILE: &str = "alglobo/src/archivo.csv";
+const LOG_FILE: &str = "logs/procesador-pagos";
+const FILE: &str = "archivo.csv";
 
 #[actix_rt::main]
 async fn main() {
@@ -65,7 +66,7 @@ async fn main() {
     let hotel_logger_address = logger_address.clone();
     let hotel_arbiter = Arbiter::new();
     let hotel_execution = async move {
-        let hotel_address = ExternalEntity::new("HOTEL", IP, PORT_BANCO, hotel_logger_address).start();
+        let hotel_address = ExternalEntity::new("HOTEL", IP, PORT_HOTEL, hotel_logger_address).start();
         hotel_s.send(hotel_address);
     };
     hotel_arbiter.spawn(hotel_execution);
@@ -92,7 +93,7 @@ async fn main() {
     let reader_arbiter = Arbiter::new();
     let reader_logger_address = logger_address.clone();
     let reader_execution = async move {
-        let reader_addr = Reader::new(LOG_FILE, pp_addr, reader_logger_address).start();
+        let reader_addr = Reader::new(FILE, pp_addr, reader_logger_address).start();
         reader_addr.try_send(LeerPaquete());
     };
     reader_arbiter.spawn(reader_execution);

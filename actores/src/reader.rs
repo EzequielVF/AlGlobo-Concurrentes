@@ -1,6 +1,10 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader};
+use std::thread;
+use std::time::Duration;
+
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
+
 use crate::{Log, Logger, PaqueteTuristico, PaymentProcessor, PP_NewPayment};
 
 pub struct Reader {
@@ -33,7 +37,7 @@ impl Reader {
                 return Reader {
                     buffer: reader,
                     pp_address: addr,
-                    logger_address: addr_log
+                    logger_address: addr_log,
                 };
             }
         }
@@ -68,9 +72,12 @@ impl Handler<LeerPaquete> for Reader {
                 id: paquete[0].parse::<usize>().unwrap(),
                 precio: paquete[1].parse::<usize>().unwrap(),
             };
-            self.logger_address.try_send(Log(format!("Se leyó paquete con id {}- y precio:{}",paquete[0], paquete[1])));
+            self.logger_address.try_send(Log(format!("Se leyó paquete con id {}- y precio:{}", paquete[0], paquete[1])));
             self.pp_address.try_send(PP_NewPayment(paquete_aux));
+
             ctx.address().try_send(LeerPaquete());
+
+            thread::sleep(Duration::from_secs(1));
         }
     }
 }
