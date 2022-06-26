@@ -23,79 +23,50 @@ const PORT_BANCO: &str = "3001";
 const PORT_HOTEL: &str = "3002";
 const IP: &str = "127.0.0.1";
 
-const FILE: &str = "alglobo/src/archivo.csv";
-/*
-fn parsear_paquetes(ruta: &str) -> Vec<PaqueteTuristico> {
-    let mut paquetes_turisticos: Vec<PaqueteTuristico> = Vec::new();
-
-    match abrir_archivo_paquetes(ruta) {
-        Ok(archivo) => {
-            for read_result in archivo.lines() {
-                match read_result {
-                    Ok(line) => {
-                        let paquete: Vec<&str> = line.split(',').collect();
-
-                        paquetes_turisticos.push(PaqueteTuristico {
-                            id: paquete[0].parse::<usize>().unwrap(),
-                            precio: paquete[1].parse::<usize>().unwrap(),
-                        })
-                    }
-                    Err(e) => {
-                        eprintln!("Ups... {}", e)
-                    }
-                }
-            }
-        }
-        Err(err) => {
-            eprintln!("Error: {}", err);
-        }
-    }
-    paquetes_turisticos
-}
-
-fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Error> {
-    match File::open(ruta) {
-        Ok(archivo_pagos) => Ok(BufReader::new(archivo_pagos)),
-        Err(err) => Err(err),
-    }
-}*/
-
+const LOG_FILE: &str = "alglobo/src/archivo.csv";
 
 #[actix_rt::main]
 async fn main() {
-    let (logger_send, logger_receive) = mpsc::channel();
 
-    //let paquetes_turisticos = parsear_paquetes(FILE);
+    //  ********** Run Logger **********
 
-    let execution = async {
+    //Create channel to comunicate with logger
+    let (logger_s, logger_rec) = mpsc::channel();
 
+    // Run logger in a new Arbiter
+    let logger_arbiter = Arbiter::new();
+    let logger_execution = async move {
+        let logger_address = Logger::new(LOG_FILE).start();
+        logger_s.send(logger_address);
+    };
+    logger_arbiter.spawn(logger_execution);
+    let logger_address = logger_rec.recv().unwrap();
+
+
+    // ********** Run Payment Processor *************+
+    logger_address.try_send(Log("Iniciando Procesador de Pagos".to_string()));
+
+    let (pp_s, pp_rec) = mpsc::channel();
+    let pp_arbiter = Arbiter::new();
+    let pp_logger_address = logger_address.clone();
+    let pp_execution = async move {
         let bank_address = ExternalEntity::new("BANK", IP, PORT_BANCO).start();
         let airline_address = ExternalEntity::new("AIRLINE", IP, PORT_AEROLINEA).start();
         let hotel_address = ExternalEntity::new("HOTEL", IP, PORT_HOTEL).start();
-
-        let pp_addr = PaymentProcessor::new(bank_address, airline_address, hotel_address, logger_send).start();
-        let reader_addr = Reader::new(FILE, pp_addr).start();
-        //reader_addr.try_send(LeerPaquete());
-
-        thread::spawn(move || {
-            loop  {
-                reader_addr.try_send(LeerPaquete());
-            }
-        })
-
+        let pp_addr = PaymentProcessor::new(bank_address, airline_address, hotel_address, pp_logger_address).start();
+        pp_s.send(pp_addr);
     };
+    pp_arbiter.spawn(pp_execution);
+    let pp_addr = pp_rec.recv().unwrap();
 
-    thread::spawn(move || {
-        // let logger = Logger::new("payment_processor");
-        loop {
-            if let Ok(rx) = logger_receive.recv() {
-                println!("[LOGGER] {}", rx)
-            }
-        }
-    });
 
-    let arbitro = Arbiter::new();
-    arbitro.spawn(execution);
-    //arbitro.join();
+    // ********** Run Package Reader *************
+    logger_address.try_send(Log("Iniciando Package Reader".to_string()));
+    let reader_arbiter = Arbiter::new();
+    let reader_execution = async move {
+        let reader_addr = Reader::new(LOG_FILE, pp_addr).start();
+        reader_addr.try_send(LeerPaquete());
+    };
+    reader_arbiter.spawn(reader_execution);
 }
 

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::Sender;
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
 use crate::external_entity::{EE_NewPayment, ExternalEntity};
+use crate::{Log, Logger};
 
 #[derive(Clone)]
 pub struct PaqueteTuristico {
