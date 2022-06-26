@@ -16,7 +16,7 @@ pub struct PaymentProcessor {
     airline_address: Addr<ExternalEntity>,
     hotel_address: Addr<ExternalEntity>,
     entity_answers: HashMap<usize, TransactionState>,
-    logger_tx: Sender<String>
+    logger_tx: Addr<Logger>
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -30,7 +30,7 @@ impl PaymentProcessor {
     pub fn new(bank_address: Addr<ExternalEntity>,
                airline_address: Addr<ExternalEntity>,
                hotel_address: Addr<ExternalEntity>,
-               logger: Sender<String>,
+               logger: Addr<Logger>,
     ) -> Self {
         PaymentProcessor {
             bank_address,
@@ -79,7 +79,7 @@ impl Handler<EntityAnswer> for PaymentProcessor {
         if let Some(transaction) = self.entity_answers.get_mut(&msg.1) {
 
             transaction.insert(msg.0.clone(), msg.2.clone());
-            &self.logger_tx.send(format!("[{}-ID:{}-Estado:{:?}]", msg.0, msg.1, msg.2));
+            &self.logger_tx.try_send(Log(format!("[{}-ID:{}-Estado:{:?}]", msg.0, msg.1, msg.2)));
             if transaction.iter().all(|(_name, state)| *state != RequestState::Sent) {
                 println!("[EntityAnswer] Recibí 3 respuestas");
                 transaction.iter()

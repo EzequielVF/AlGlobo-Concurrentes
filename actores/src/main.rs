@@ -7,6 +7,7 @@ use actix_rt::{Arbiter, System};
 use crate::comunicacion::Tipo;
 use crate::comunicacion::Tipo::{Error, Pay, Succesfull, Unknown};
 use crate::external_entity::ExternalEntity;
+use crate::logger::{Log, Logger};
 use crate::payment_processor::{PaqueteTuristico, PaymentProcessor, PP_NewPayment};
 use crate::reader::{LeerPaquete, Reader};
 
@@ -14,6 +15,7 @@ use crate::reader::{LeerPaquete, Reader};
 mod external_entity;
 mod payment_processor;
 mod comunicacion;
+mod logger;
 mod reader;
 
 const PORT_AEROLINEA: &str = "3000";
