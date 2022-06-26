@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::sync::mpsc;
 use std::thread;
 
@@ -24,7 +22,7 @@ const PORT_HOTEL: &str = "3002";
 const IP: &str = "127.0.0.1";
 
 const FILE: &str = "alglobo/src/archivo.csv";
-
+/*
 fn parsear_paquetes(ruta: &str) -> Vec<PaqueteTuristico> {
     let mut paquetes_turisticos: Vec<PaqueteTuristico> = Vec::new();
 
@@ -58,25 +56,31 @@ fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Error>
         Ok(archivo_pagos) => Ok(BufReader::new(archivo_pagos)),
         Err(err) => Err(err),
     }
-}
+}*/
 
 
 #[actix_rt::main]
 async fn main() {
     let (logger_send, logger_receive) = mpsc::channel();
 
-    let paquetes_turisticos = parsear_paquetes(FILE);
+    //let paquetes_turisticos = parsear_paquetes(FILE);
 
     let execution = async {
+
         let bank_address = ExternalEntity::new("BANK", IP, PORT_BANCO).start();
         let airline_address = ExternalEntity::new("AIRLINE", IP, PORT_AEROLINEA).start();
         let hotel_address = ExternalEntity::new("HOTEL", IP, PORT_HOTEL).start();
 
         let pp_addr = PaymentProcessor::new(bank_address, airline_address, hotel_address, logger_send).start();
+        let reader_addr = Reader::new(FILE, pp_addr).start();
+        //reader_addr.try_send(LeerPaquete());
 
-        for paquete in paquetes_turisticos {
-            pp_addr.try_send(PP_NewPayment(paquete));
-        }
+        thread::spawn(move || {
+            loop  {
+                reader_addr.try_send(LeerPaquete());
+            }
+        })
+
     };
 
     thread::spawn(move || {
@@ -90,6 +94,6 @@ async fn main() {
 
     let arbitro = Arbiter::new();
     arbitro.spawn(execution);
-    arbitro.join();
+    //arbitro.join();
 }
 
