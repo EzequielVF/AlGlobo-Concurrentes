@@ -15,7 +15,7 @@ const ERROR: u8 = 1;
 
 pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
     let address = format!("{}:{}", ip, port);
-    let logger = Arc::new(Mutex::new(Logger::new(String::from(nombre))));
+    let logger = Arc::new(Mutex::new(Logger::new(nombre)));
     {
         logger.lock().unwrap().log(format!("Esperando clientes en: {}", address).as_str());
     }
