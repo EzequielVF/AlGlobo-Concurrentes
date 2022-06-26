@@ -17,7 +17,7 @@ pub struct PaymentProcessor {
     airline_address: Addr<ExternalEntity>,
     hotel_address: Addr<ExternalEntity>,
     entity_answers: HashMap<usize, TransactionState>,
-    logger_tx: Addr<Logger>
+    logger_address: Addr<Logger>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +38,7 @@ impl PaymentProcessor {
             airline_address,
             hotel_address,
             entity_answers: HashMap::<usize, HashMap<String, RequestState>>::new(),
-            logger_tx: logger
+            logger_address: logger,
         }
     }
 }
@@ -65,6 +65,7 @@ impl Handler<PP_NewPayment> for PaymentProcessor {
             ("AIRLINE".to_string(), RequestState::Sent),
             ("HOTEL".to_string(), RequestState::Sent)
         ]));
+        self.logger_address.try_send(Log(format!("Se envía paquete de id {} a entidades para procesamiento", msg.0.id)));
     }
 }
 
@@ -78,9 +79,9 @@ impl Handler<EntityAnswer> for PaymentProcessor {
 
     fn handle(&mut self, msg: EntityAnswer, _ctx: &mut Context<Self>) -> Self::Result {
         if let Some(transaction) = self.entity_answers.get_mut(&msg.1) {
-
             transaction.insert(msg.0.clone(), msg.2.clone());
-            &self.logger_tx.try_send(Log(format!("[{}-ID:{}-Estado:{:?}]", msg.0, msg.1, msg.2)));
+            &self.logger_address.try_send(Log(format!("[{}-ID:{}-Estado:{:?}]", msg.0, msg.1, msg.2)));
+
             if transaction.iter().all(|(_name, state)| *state != RequestState::Sent) {
                 println!("[EntityAnswer] Recibí 3 respuestas");
                 transaction.iter()

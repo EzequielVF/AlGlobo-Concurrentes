@@ -76,7 +76,7 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
 
 fn procesamiento_aleatorio() {
     const FACTOR_TEMPORAL: u64 = 1;
-    let ms = thread_rng().gen_range(1000, 3000);
+    let ms = thread_rng().gen_range(2000, 5000);
     thread::sleep(Duration::from_millis(ms * FACTOR_TEMPORAL));
 }
 

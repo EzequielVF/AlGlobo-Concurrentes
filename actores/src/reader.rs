@@ -1,21 +1,23 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader};
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
-use crate::{PaqueteTuristico, PaymentProcessor, PP_NewPayment};
+use crate::{Log, Logger, PaqueteTuristico, PaymentProcessor, PP_NewPayment};
 
 pub struct Reader {
     buffer: BufReader<File>,
-    address: Addr<PaymentProcessor>
+    pp_address: Addr<PaymentProcessor>,
+    logger_address: Addr<Logger>,
 }
 
 impl Reader {
-    pub fn new(path: &str, addr: Addr<PaymentProcessor>) -> Self{
+    pub fn new(path: &str, addr: Addr<PaymentProcessor>, addr_log: Addr<Logger>) -> Self {
         let t = abrir_archivo_paquetes(path);
         match t {
             Ok(b) => {
                 return Reader {
                     buffer: b,
-                    address: addr
+                    pp_address: addr,
+                    logger_address: addr_log,
                 };
             }
             Err(_) => {
@@ -30,7 +32,8 @@ impl Reader {
                 let mut reader = BufReader::new(file);
                 return Reader {
                     buffer: reader,
-                    address: addr
+                    pp_address: addr,
+                    logger_address: addr_log
                 };
             }
         }
@@ -56,7 +59,7 @@ impl Handler<LeerPaquete> for Reader {
     type Result = ();
 
     fn handle(&mut self, msg: LeerPaquete, ctx: &mut Context<Self>) -> Self::Result {
-        let mut buffer= String::from("");
+        let mut buffer = String::from("");
         let mut aux = self.buffer.read_line(&mut buffer);
 
         if aux.unwrap() > 0 {
@@ -65,8 +68,8 @@ impl Handler<LeerPaquete> for Reader {
                 id: paquete[0].parse::<usize>().unwrap(),
                 precio: paquete[1].parse::<usize>().unwrap(),
             };
-
-            self.address.try_send(PP_NewPayment(paquete_aux));
+            self.logger_address.try_send(Log(format!("Se leyó paquete con id {}- y precio:{}",paquete[0], paquete[1])));
+            self.pp_address.try_send(PP_NewPayment(paquete_aux));
             ctx.address().try_send(LeerPaquete());
         }
     }
