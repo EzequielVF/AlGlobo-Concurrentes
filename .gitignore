@@ -8,3 +8,4 @@ target/
 
 # Archivos consumidos
 *.log
+*.csv

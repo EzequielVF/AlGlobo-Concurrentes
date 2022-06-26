@@ -10,10 +10,13 @@ use crate::comunicacion::Tipo;
 use crate::comunicacion::Tipo::{Error, Pay, Succesfull, Unknown};
 use crate::external_entity::ExternalEntity;
 use crate::payment_processor::{PaqueteTuristico, PaymentProcessor, PP_NewPayment};
+use crate::reader::{LeerPaquete, Reader};
+
 
 mod external_entity;
 mod payment_processor;
 mod comunicacion;
+mod reader;
 
 const PORT_AEROLINEA: &str = "3000";
 const PORT_BANCO: &str = "3001";
@@ -77,6 +80,7 @@ async fn main() {
     };
 
     thread::spawn(move || {
+        // let logger = Logger::new("payment_processor");
         loop {
             if let Ok(rx) = logger_receive.recv() {
                 println!("[LOGGER] {}", rx)
