@@ -1,0 +1,22 @@
+[package]
+name = "external"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.7"
+chrono = "0.4.19"
+
+[[bin]]
+name = "aerolinea"
+path = "src/aerolinea.rs"
+
+[[bin]]
+name = "banco"
+path = "src/banco.rs"
+
+[[bin]]
+name = "hotel"
+path = "src/hotel.rs"

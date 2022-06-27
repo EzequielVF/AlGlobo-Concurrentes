@@ -7,4 +7,5 @@ target/
 *.iml
 
 # Archivos consumidos
+*.log
 *.csv
