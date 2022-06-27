@@ -1,9 +1,11 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
+
 use crate::external_entity::TransactionResult;
 use crate::PaqueteTuristico;
 use crate::payment_processor::RequestState;
-pub use self::Tipo::{Error, Pay, Succesfull, Unknown, Commit, Rollback};
+
+pub use self::Tipo::{Commit, Error, Pay, Rollback, Succesfull, Unknown};
 
 pub enum Tipo {
     Error,
@@ -94,7 +96,7 @@ pub fn enviar_resultado(stream: &mut TcpStream, trans_result: TransactionResult)
     if trans_result.result {
         buffer = [Commit.into(), size];
     } else {
-        buffer = [Commit.into(), size];
+        buffer = [Rollback.into(), size];
     }
 
     match stream.write_all(&buffer) {

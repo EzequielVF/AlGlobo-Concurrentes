@@ -47,10 +47,9 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                 let _aux = stream.read_exact(&mut buffer_packet); //Leo lo que me dijeron que lea
                 match message_type {
                     Pay => {
-                        {
-                            logger.lock().unwrap().log("<SERVER> Recibi un pago, voy a procesarlo!");
-                        }
                         let aux = read(buffer_packet);
+                        logger.lock().unwrap().log(format!("<SERVER> Recibi una transacción de codigo {}, voy a procesarlo!", aux).as_str());
+
                         if pago_es_correcto() {
                             println!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux);
                             send_succesfull_message(stream);
