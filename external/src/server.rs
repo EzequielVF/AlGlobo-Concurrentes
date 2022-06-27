@@ -4,21 +4,23 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 
 use crate::logger::Logger;
 use crate::server::Tipo::{Commit, Rollback};
 
-pub use self::Tipo::{Error, Pay, Succesfull, Unknown};
+pub use self::Tipo::{Error, Pay, Successful, Unknown};
 
-static SERVER_ARGS: usize = 2;
 const ERROR: u8 = 1;
 
 pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
     let address = format!("{}:{}", ip, port);
     let logger = Arc::new(Mutex::new(Logger::new(nombre)));
     {
-        logger.lock().unwrap().log(format!("Esperando clientes en: {}", address).as_str());
+        logger
+            .lock()
+            .unwrap()
+            .log(format!("Esperando clientes en: {}", address).as_str());
     }
     loop {
         let listener = TcpListener::bind(&address)?;
@@ -48,11 +50,17 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                 match message_type {
                     Pay => {
                         let aux = read(buffer_packet);
-                        logger.lock().unwrap().log(format!("<SERVER> Recibi una transacción de codigo {}, voy a procesarlo!", aux).as_str());
+                        logger.lock().unwrap().log(
+                            format!(
+                                "<SERVER> Recibi una transacción de codigo {}, voy a procesarlo!",
+                                aux
+                            )
+                            .as_str(),
+                        );
 
                         if pago_es_correcto() {
                             println!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux);
-                            send_succesfull_message(stream);
+                            send_successful_message(stream);
                         } else {
                             println!(
                                 "<SERVER> Tuvimos un problema al validar el pago de {}$.",
@@ -63,11 +71,16 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                     }
                     Commit => {
                         let aux = read(buffer_packet);
-                        logger.lock().unwrap().log(format!("<SERVER> La operacion con ID:{} fue Commiteada",aux).as_str());
+                        logger.lock().unwrap().log(
+                            format!("<SERVER> La operacion con ID:{} fue Commiteada", aux).as_str(),
+                        );
                     }
                     Rollback => {
                         let aux = read(buffer_packet);
-                        logger.lock().unwrap().log(format!("<SERVER> La operacion con ID:{} fue RollBackeada!",aux).as_str());
+                        logger.lock().unwrap().log(
+                            format!("<SERVER> La operacion con ID:{} fue RollBackeada!", aux)
+                                .as_str(),
+                        );
                     }
                     _ => {
                         println!("<SERVER> Mensaje desconocido");
@@ -98,8 +111,8 @@ fn pago_es_correcto() -> bool {
     valor > UMBRAL_ERROR
 }
 
-fn send_succesfull_message(stream: &mut TcpStream) {
-    let buffer = [Succesfull.into(), 0_u8];
+fn send_successful_message(stream: &mut TcpStream) {
+    let buffer = [Successful.into(), 0_u8];
     match stream.write_all(&buffer) {
         Ok(_) => {
             println!("<SERVER> Mensaje enviado correctamente!");
@@ -141,7 +154,7 @@ fn read(buffer_packet: Vec<u8>) -> String {
 pub enum Tipo {
     Error,
     Pay,
-    Succesfull,
+    Successful,
     Commit,
     Rollback,
     Unknown,
@@ -151,7 +164,7 @@ impl From<u8> for Tipo {
     fn from(code: u8) -> Tipo {
         match code & 0xF0 {
             0x00 => Pay,
-            0x10 => Succesfull,
+            0x10 => Successful,
             0x20 => Error,
             0x30 => Commit,
             0x40 => Rollback,
@@ -164,7 +177,7 @@ impl From<Tipo> for u8 {
     fn from(code: Tipo) -> u8 {
         match code {
             Pay => 0x00,
-            Succesfull => 0x10,
+            Successful => 0x10,
             Error => 0x20,
             Commit => 0x30,
             Rollback => 0x40,

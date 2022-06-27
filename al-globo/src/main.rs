@@ -1,25 +1,22 @@
 use std::env::args;
 use std::mem::size_of;
 use std::net::UdpSocket;
-use std::sync::{Arc, Condvar, mpsc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use actix::Actor;
-use actix_rt::{Arbiter, System};
+use actix_rt::Arbiter;
 
-use crate::comunicacion::Tipo;
-use crate::comunicacion::Tipo::{Error, Pay, Succesfull, Unknown};
 use crate::external_entity::ExternalEntity;
 use crate::logger::{Log, Logger};
-use crate::payment_processor::{PaqueteTuristico, PaymentProcessor, PP_NewPayment};
+use crate::payment_processor::{PaqueteTuristico, PayProcNewPayment, PaymentProcessor};
 use crate::reader::{LeerPaquete, Reader};
 
-mod external_entity;
-mod payment_processor;
 mod comunicacion;
+mod external_entity;
 mod logger;
+mod payment_processor;
 mod reader;
 
 const PORT_AEROLINEA: &str = "3000";
@@ -33,9 +30,13 @@ const FILE: &str = "archivo.csv";
 const TIMEOUT: Duration = Duration::from_secs(10);
 const REPLICAS: usize = 3;
 
-fn id_to_ctrladdr(id: usize) -> String { "127.0.0.1:1234".to_owned() + &*id.to_string() }
+fn id_to_ctrladdr(id: usize) -> String {
+    "127.0.0.1:1234".to_owned() + &*id.to_string()
+}
 
-fn id_to_dataaddr(id: usize) -> String { "127.0.0.1:1235".to_owned() + &*id.to_string() }
+fn id_to_dataaddr(id: usize) -> String {
+    "127.0.0.1:1235".to_owned() + &*id.to_string()
+}
 
 struct LeaderElection {
     id: usize,
@@ -67,11 +68,17 @@ impl LeaderElection {
     }
 
     fn get_leader_id(&self) -> usize {
-        self.leader_id.1.wait_while(self.leader_id.0.lock().unwrap(), |leader_id| leader_id.is_none()).unwrap().unwrap()
+        self.leader_id
+            .1
+            .wait_while(self.leader_id.0.lock().unwrap(), |leader_id| {
+                leader_id.is_none()
+            })
+            .unwrap()
+            .unwrap()
     }
 
     fn id_to_msg(&self, header: u8) -> Vec<u8> {
-        let mut msg = vec!(header);
+        let mut msg = vec![header];
         msg.extend_from_slice(&self.id.to_le_bytes());
         msg
     }
@@ -80,7 +87,9 @@ impl LeaderElection {
         // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
         let msg = self.id_to_msg(b'E');
         for replica_id in (self.id + 1)..REPLICAS {
-            self.socket.send_to(&msg, id_to_ctrladdr(replica_id)).unwrap();
+            self.socket
+                .send_to(&msg, id_to_ctrladdr(replica_id))
+                .unwrap();
         }
     }
 
@@ -94,7 +103,10 @@ impl LeaderElection {
             }
         }
         *self.leader_id.0.lock().unwrap() = Some(self.id);
-        println!("ahora soy el liderrr, {:?}", *self.leader_id.0.lock().unwrap());
+        println!(
+            "ahora soy el liderrr, {:?}",
+            *self.leader_id.0.lock().unwrap()
+        );
     }
 
     fn find_new(&mut self) {
@@ -114,21 +126,30 @@ impl LeaderElection {
         self.send_election();
 
         // 2. Si nadie responde, P gana la elección y es el nuevo coordinador
-        let got_ok = self.got_ok.1.wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it);
+        let got_ok =
+            self.got_ok
+                .1
+                .wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it);
         println!("llegue hasta aca");
         if !*got_ok.unwrap().0 {
             println!("Me falta entrar acá");
             self.make_me_leader()
-        } else { // 3. Si contesta algún proceso con número mayor, éste continúa con el proceso y P finaliza
-            self.leader_id.1.wait_while(self.leader_id.0.lock().unwrap(), |leader_id| leader_id.is_none());
-            //System::current().stop();
+        } else {
+            // 3. Si contesta algún proceso con número mayor, éste continúa con el proceso y P finaliza
+            let _lock = self
+                .leader_id
+                .1
+                .wait_while(self.leader_id.0.lock().unwrap(), |leader_id| {
+                    leader_id.is_none()
+                })
+                .expect("condvar, problema con el wait-while!");
         }
     }
 
     fn responder(&mut self, flag: Arc<Mutex<bool>>) {
         while !*self.stop.0.lock().unwrap() {
             let mut buf = [0; size_of::<usize>() + 1];
-            let (size, from) = self.socket.recv_from(&mut buf).unwrap();
+            let (_size, _from) = self.socket.recv_from(&mut buf).unwrap();
             let id_from = usize::from_le_bytes(buf[1..].try_into().unwrap());
             if *self.stop.0.lock().unwrap() {
                 break;
@@ -142,7 +163,9 @@ impl LeaderElection {
                 b'E' => {
                     println!("[{}] recibí Election de {}", self.id, id_from);
                     if id_from < self.id {
-                        self.socket.send_to(&self.id_to_msg(b'O'), id_to_ctrladdr(id_from)).unwrap();
+                        self.socket
+                            .send_to(&self.id_to_msg(b'O'), id_to_ctrladdr(id_from))
+                            .unwrap();
                         let mut me = self.clone();
                         thread::spawn(move || me.find_new());
                     }
@@ -163,9 +186,14 @@ impl LeaderElection {
         self.stop.1.notify_all();
     }
 
+    #[allow(dead_code)]
     fn stop(&mut self) {
         *self.stop.0.lock().unwrap() = true;
-        self.stop.1.wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop);
+        let _lock = self
+            .stop
+            .1
+            .wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop)
+            .expect("condvar, problema con el wait-while!");
     }
 
     fn clone(&self) -> LeaderElection {
@@ -184,14 +212,10 @@ async fn main() {
     // ********** Leader **********
     let argv = args().collect::<Vec<String>>();
 
-    /*if argv.len() != 2 {
-        println!("Número inválido de argumentos");
-        return Err(());
-    }*/
-    let my_id = usize::from_str_radix(&argv[1], 10).unwrap();
-    let mut flag = Arc::new(Mutex::new(false));
+    let my_id = argv[1].parse::<usize>().unwrap();
+    let flag = Arc::new(Mutex::new(false));
     let mut leader_election: LeaderElection = LeaderElection::new(my_id, flag.clone());
-    let mut socket = UdpSocket::bind(id_to_dataaddr(my_id)).unwrap();
+    let socket = UdpSocket::bind(id_to_dataaddr(my_id)).unwrap();
     let mut buf = [0; 4];
 
     loop {
@@ -208,7 +232,9 @@ async fn main() {
             let logger_arbiter = Arbiter::new();
             let logger_execution = async move {
                 let logger_address = Logger::new(LOG_FILE).start();
-                logger_s.send(logger_address);
+                logger_s
+                    .send(logger_address)
+                    .expect("logger send, problema al enviar!");
             };
             logger_arbiter.spawn(logger_execution);
             let logger_address = logger_rec.recv().unwrap();
@@ -219,8 +245,12 @@ async fn main() {
             let airline_logger_address = logger_address.clone();
             let airline_arbiter = Arbiter::new();
             let airline_execution = async move {
-                let airline_address = ExternalEntity::new("AIRLINE", IP, PORT_AEROLINEA, airline_logger_address).start();
-                airline_s.send(airline_address);
+                let airline_address =
+                    ExternalEntity::new("AIRLINE", IP, PORT_AEROLINEA, airline_logger_address)
+                        .start();
+                airline_s
+                    .send(airline_address)
+                    .expect("airline send, problema al enviar!");
             };
             airline_arbiter.spawn(airline_execution);
 
@@ -229,8 +259,11 @@ async fn main() {
             let bank_logger_address = logger_address.clone();
             let bank_arbiter = Arbiter::new();
             let bank_execution = async move {
-                let bank_address = ExternalEntity::new("BANK", IP, PORT_BANCO, bank_logger_address).start();
-                bank_s.send(bank_address);
+                let bank_address =
+                    ExternalEntity::new("BANK", IP, PORT_BANCO, bank_logger_address).start();
+                bank_s
+                    .send(bank_address)
+                    .expect("bank send, problema al enviar!");
             };
             bank_arbiter.spawn(bank_execution);
 
@@ -239,49 +272,66 @@ async fn main() {
             let hotel_logger_address = logger_address.clone();
             let hotel_arbiter = Arbiter::new();
             let hotel_execution = async move {
-                let hotel_address = ExternalEntity::new("HOTEL", IP, PORT_HOTEL, hotel_logger_address).start();
-                hotel_s.send(hotel_address);
+                let hotel_address =
+                    ExternalEntity::new("HOTEL", IP, PORT_HOTEL, hotel_logger_address).start();
+                hotel_s
+                    .send(hotel_address)
+                    .expect("hotel send, problema al enviar!");
             };
             hotel_arbiter.spawn(hotel_execution);
 
             // ********** Run Payment Processor *************+
-            logger_address.try_send(Log("Iniciando Procesador de Pagos".to_string()));
+            logger_address.do_send(Log("Iniciando Procesador de Pagos".to_string()));
 
             let (pp_tx, pp_rx) = mpsc::channel();
             let pp_arbiter = Arbiter::new();
             let pp_logger_address = logger_address.clone();
             let pp_execution = async move {
-                let airline_address = airline_rec.recv().expect("Falló recepción dirección Aerolínea");
+                let airline_address = airline_rec
+                    .recv()
+                    .expect("Falló recepción dirección Aerolínea");
                 let bank_address = bank_rec.recv().expect("Falló recepción dirección Banco");
                 let hotel_address = hotel_rec.recv().expect("Falló recepción dirección Hotel");
-                let pp_addr = PaymentProcessor::new(bank_address, airline_address, hotel_address, pp_logger_address).start();
-                pp_tx.send(pp_addr);
+                let pp_addr = PaymentProcessor::new(
+                    bank_address,
+                    airline_address,
+                    hotel_address,
+                    pp_logger_address,
+                )
+                .start();
+                pp_tx.send(pp_addr).expect("pp send, problema al enviar!");
             };
             pp_arbiter.spawn(pp_execution);
             let pp_addr = pp_rx.recv().unwrap();
 
-
             // ********** Run Package Reader *************
-            logger_address.try_send(Log("Iniciando Package Reader".to_string()));
+            logger_address.do_send(Log("Iniciando Package Reader".to_string()));
             let reader_arbiter = Arbiter::new();
             let reader_logger_address = logger_address.clone();
             let reader_execution = async move {
                 let reader_addr = Reader::new(FILE, pp_addr, reader_logger_address).start();
-                reader_addr.try_send(LeerPaquete());
+                reader_addr.do_send(LeerPaquete());
             };
             reader_arbiter.spawn(reader_execution);
 
-            while *flag.lock().unwrap() == false {
-                socket.set_read_timeout(None);
-                let (size, from) = socket.recv_from(&mut buf).unwrap();
+            // TODO: ¿llevar a un nuevo thread?
+            while !(*flag.lock().unwrap()) {
+                socket
+                    .set_read_timeout(None)
+                    .expect("socket timeout, problema!");
+                let (_size, from) = socket.recv_from(&mut buf).unwrap();
                 thread::sleep(Duration::from_secs(3));
-                socket.send_to("PONG".as_bytes(), from).unwrap();
+                socket
+                    .send_to("PONG".as_bytes(), from)
+                    .expect("socket send, problema al enviar en PONG");
             }
+
             pp_arbiter.stop();
             reader_arbiter.stop();
             bank_arbiter.stop();
             hotel_arbiter.stop();
             airline_arbiter.stop();
+
             /*
             logger_arbiter.stop();
             airline_arbiter.stop();
@@ -293,11 +343,12 @@ async fn main() {
         } else {
             let leader_id = leader_election.get_leader_id();
 
-
-            socket.send_to("PING".as_bytes(), id_to_dataaddr(leader_id)).unwrap();
+            socket
+                .send_to("PING".as_bytes(), id_to_dataaddr(leader_id))
+                .unwrap();
             socket.set_read_timeout(Some(TIMEOUT)).unwrap();
 
-            if let Ok((size, from)) = socket.recv_from(&mut buf) {
+            if let Ok((_size, _from)) = socket.recv_from(&mut buf) {
                 // todo
                 println!("Me contestó el lider");
             } else {

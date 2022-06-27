@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
 
-use crate::{Log, Logger, PaqueteTuristico, PaymentProcessor, PP_NewPayment};
+use crate::{Log, Logger, PaqueteTuristico, PayProcNewPayment, PaymentProcessor};
 
 pub struct Reader {
     buffer: BufReader<File>,
@@ -17,13 +17,11 @@ impl Reader {
     pub fn new(path: &str, addr: Addr<PaymentProcessor>, addr_log: Addr<Logger>) -> Self {
         let t = abrir_archivo_paquetes(path);
         match t {
-            Ok(b) => {
-                return Reader {
-                    buffer: b,
-                    pp_address: addr,
-                    logger_address: addr_log,
-                };
-            }
+            Ok(b) => Reader {
+                buffer: b,
+                pp_address: addr,
+                logger_address: addr_log,
+            },
             Err(_) => {
                 println!("<MAIN> No pude abrir el archivo!");
                 let file = OpenOptions::new()
@@ -33,12 +31,12 @@ impl Reader {
                     .open(path)
                     .expect("Error creando archivo de log");
 
-                let mut reader = BufReader::new(file);
-                return Reader {
+                let reader = BufReader::new(file);
+                Reader {
                     buffer: reader,
                     pp_address: addr,
                     logger_address: addr_log,
-                };
+                }
             }
         }
     }
@@ -62,9 +60,9 @@ pub struct LeerPaquete();
 impl Handler<LeerPaquete> for Reader {
     type Result = ();
 
-    fn handle(&mut self, msg: LeerPaquete, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, _msg: LeerPaquete, ctx: &mut Context<Self>) -> Self::Result {
         let mut buffer = String::from("");
-        let mut aux = self.buffer.read_line(&mut buffer);
+        let aux = self.buffer.read_line(&mut buffer);
 
         if aux.unwrap() > 0 {
             let paquete: Vec<&str> = buffer.split(',').collect();
@@ -72,10 +70,13 @@ impl Handler<LeerPaquete> for Reader {
                 id: paquete[0].parse::<usize>().unwrap(),
                 precio: paquete[1].parse::<usize>().unwrap(),
             };
-            self.logger_address.try_send(Log(format!("Se leyó paquete con id {}- y precio:{}", paquete[0], paquete[1])));
-            self.pp_address.try_send(PP_NewPayment(paquete_aux));
+            self.logger_address.do_send(Log(format!(
+                "Se leyó paquete con id {}- y precio:{}",
+                paquete[0], paquete[1]
+            )));
+            self.pp_address.do_send(PayProcNewPayment(paquete_aux));
 
-            ctx.address().try_send(LeerPaquete());
+            ctx.address().do_send(LeerPaquete());
 
             thread::sleep(Duration::from_secs(1));
         }

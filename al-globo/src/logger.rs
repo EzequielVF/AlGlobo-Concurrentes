@@ -1,7 +1,6 @@
-use std::fmt::format;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::time::{Duration, SystemTime};
+
 use actix::{Actor, Context, Handler, Message};
 use chrono::Local;
 
@@ -24,12 +23,9 @@ impl Logger {
             .open(filename)
             .expect("Error creando archivo de log");
 
-        Logger {
-            file: log_file
-        }
+        Logger { file: log_file }
     }
 }
-
 
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
@@ -41,7 +37,8 @@ impl Handler<Log> for Logger {
     fn handle(&mut self, msg: Log, _ctx: &mut Context<Self>) -> Self::Result {
         let time = Local::now().to_string();
         let message = format!("[{}] - {}\n", time, msg.0);
-        self.file.write_all(message.as_bytes())
+        self.file
+            .write_all(message.as_bytes())
             .expect("Error escribiendo archivo de log");
     }
 }

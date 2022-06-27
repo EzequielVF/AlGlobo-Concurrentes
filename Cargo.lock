@@ -59,22 +59,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "actores"
+name = "al-globo"
 version = "0.1.0"
 dependencies = [
  "actix",
  "actix-rt",
  "chrono",
- "external",
-]
-
-[[package]]
-name = "alglobo"
-version = "0.1.0"
-dependencies = [
- "actix",
- "actix-rt",
- "rand",
 ]
 
 [[package]]

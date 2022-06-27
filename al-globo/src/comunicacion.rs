@@ -2,15 +2,15 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 
 use crate::external_entity::TransactionResult;
-use crate::PaqueteTuristico;
 use crate::payment_processor::RequestState;
+use crate::PaqueteTuristico;
 
-pub use self::Tipo::{Commit, Error, Pay, Rollback, Succesfull, Unknown};
+pub use self::Tipo::{Commit, Error, Pay, Rollback, Successful, Unknown};
 
 pub enum Tipo {
     Error,
     Pay,
-    Succesfull,
+    Successful,
     Commit,
     Rollback,
     Unknown,
@@ -20,7 +20,7 @@ impl From<u8> for Tipo {
     fn from(code: u8) -> Tipo {
         match code & 0xF0 {
             0x00 => Pay,
-            0x10 => Succesfull,
+            0x10 => Successful,
             0x20 => Error,
             0x30 => Commit,
             0x40 => Rollback,
@@ -33,7 +33,7 @@ impl From<Tipo> for u8 {
     fn from(code: Tipo) -> u8 {
         match code {
             Pay => 0x00,
-            Succesfull => 0x10,
+            Successful => 0x10,
             Error => 0x20,
             Commit => 0x30,
             Rollback => 0x40,
@@ -46,7 +46,7 @@ impl From<Tipo> for u8 {
 pub fn conectar_con_servidor(ip: &str, port: &str) -> Result<TcpStream, std::io::Error> {
     let address = format!("{}:{}", ip, port);
     println!("<CLIENTE> Intentando establecer conexión con: {}", address);
-    let mut stream = TcpStream::connect(address);
+    let stream = TcpStream::connect(address);
     match stream {
         Ok(stream) => {
             println!("Conectado exitosamente");
@@ -59,15 +59,15 @@ pub fn conectar_con_servidor(ip: &str, port: &str) -> Result<TcpStream, std::io:
     }
 }
 
-pub fn enviar_paquete(stream: &mut TcpStream, paquete: PaqueteTuristico, name: &String) {
+pub fn enviar_paquete(stream: &mut TcpStream, paquete: PaqueteTuristico, name: &str) {
     let cantidad_pago = paquete.precio.to_string();
     let size = (cantidad_pago.len() + 1) as u8;
     let buffer = [Pay.into(), size];
     match stream.write_all(&buffer) {
         Ok(_) => {
             println!(
-                "<{}> Mensaje (id: {}) enviado correctamente!", name,
-                paquete.id
+                "<{}> Mensaje (id: {}) enviado correctamente!",
+                name, paquete.id
             );
         }
         Err(_) => {
@@ -80,8 +80,8 @@ pub fn enviar_paquete(stream: &mut TcpStream, paquete: PaqueteTuristico, name: &
     match stream.write(&buffer_envio) {
         Ok(_) => {
             println!(
-                "<{}> Mensaje (id: {}) enviado correctamente!", name,
-                paquete.id
+                "<{}> Mensaje (id: {}) enviado correctamente!",
+                name, paquete.id
             );
         }
         Err(_) => {
@@ -92,12 +92,11 @@ pub fn enviar_paquete(stream: &mut TcpStream, paquete: PaqueteTuristico, name: &
 
 pub fn enviar_resultado(stream: &mut TcpStream, trans_result: TransactionResult) {
     let size = (trans_result.transaction_id.len() + 1) as u8;
-    let buffer;
-    if trans_result.result {
-        buffer = [Commit.into(), size];
+    let buffer = if trans_result.result {
+        [Commit.into(), size]
     } else {
-        buffer = [Rollback.into(), size];
-    }
+        [Rollback.into(), size]
+    };
 
     match stream.write_all(&buffer) {
         Ok(_) => {
@@ -135,14 +134,8 @@ pub fn leer_respuesta(stream: &mut TcpStream) -> RequestState {
     let mut num_buffer = [0u8; 2];
     let _aux = stream.read_exact(&mut num_buffer);
     match Tipo::from(num_buffer[0]) {
-        Succesfull => {
-            return RequestState::Ok;
-        }
-        Error => {
-            return RequestState::Failed;
-        }
-        _ => {
-            return RequestState::Failed;
-        }
+        Successful => RequestState::Ok,
+        Error => RequestState::Failed,
+        _ => RequestState::Failed,
     }
 }

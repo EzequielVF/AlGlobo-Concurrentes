@@ -1,5 +1,5 @@
 [package]
-name = "actores"
+name = "al-globo"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,9 +8,8 @@ edition = "2021"
 [dependencies]
 actix = "0.11.0"
 actix-rt = "2.2"
-external = { path = "../external" }
 chrono = "0.4.19"
 
 [[bin]]
-name = "main"
+name = "al-globo"
 path = "src/main.rs"

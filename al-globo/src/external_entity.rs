@@ -1,12 +1,12 @@
 use std::net::TcpStream;
-use std::time::Duration;
 
-use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
-use actix::clock::sleep;
+use actix::{Actor, Addr, Context, Handler, Message};
 
-use crate::{Log, Logger, PaqueteTuristico, PaymentProcessor, PP_NewPayment};
-use crate::comunicacion::{conectar_con_servidor, enviar_paquete, enviar_resultado, leer_respuesta};
-use crate::payment_processor::{EntityAnswer, RequestState};
+use crate::comunicacion::{
+    conectar_con_servidor, enviar_paquete, enviar_resultado, leer_respuesta,
+};
+use crate::payment_processor::EntityAnswer;
+use crate::{Log, Logger, PaqueteTuristico, PaymentProcessor};
 
 pub struct ExternalEntity {
     name: String,
@@ -31,20 +31,26 @@ impl ExternalEntity {
 
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct EE_NewPayment(pub PaqueteTuristico, pub Addr<PaymentProcessor>);
+pub struct ExtEntNewPayment(pub PaqueteTuristico, pub Addr<PaymentProcessor>);
 
-impl Handler<EE_NewPayment> for ExternalEntity {
+impl Handler<ExtEntNewPayment> for ExternalEntity {
     type Result = ();
 
-    fn handle(&mut self, msg: EE_NewPayment, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ExtEntNewPayment, _ctx: &mut Context<Self>) -> Self::Result {
         match &self.stream {
             Ok(t) => {
                 let mut channel = t.try_clone().unwrap();
                 enviar_paquete(&mut channel, msg.0.clone(), &self.name);
-                self.logger_address.try_send(Log(format!("[{}], Envio paquete de codigo {} para procesamiento", self.name, msg.0.id)));
+                self.logger_address.do_send(Log(format!(
+                    "[{}], Envio paquete de codigo {} para procesamiento",
+                    self.name, msg.0.id
+                )));
                 let response = leer_respuesta(&mut t.try_clone().unwrap());
-                self.logger_address.try_send(Log(format!("[{}], Recibo respuesta paquete de codigo {} por parte del servidor", self.name, msg.0.id)));
-                (msg.1).try_send(EntityAnswer(self.name.clone(), msg.0.id.clone(), response));
+                self.logger_address.do_send(Log(format!(
+                    "[{}], Recibo respuesta paquete de codigo {} por parte del servidor",
+                    self.name, msg.0.id
+                )));
+                (msg.1).do_send(EntityAnswer(self.name.clone(), msg.0.id, response));
             }
             Err(_) => {}
         }
@@ -66,9 +72,15 @@ impl Handler<TransactionResultMessage> for ExternalEntity {
 
     fn handle(&mut self, msg: TransactionResultMessage, _ctx: &mut Context<Self>) -> Self::Result {
         if msg.0.result {
-            self.logger_address.try_send(Log(format!("[{}] Se envía confirmación para transaccion {}", self.name, msg.0.transaction_id)));
+            self.logger_address.do_send(Log(format!(
+                "[{}] Se envía confirmación para transaccion {}",
+                self.name, msg.0.transaction_id
+            )));
         } else {
-            self.logger_address.try_send(Log(format!("[{}]  Se envía rollback para transacción {}", self.name, msg.0.transaction_id)));
+            self.logger_address.do_send(Log(format!(
+                "[{}]  Se envía rollback para transacción {}",
+                self.name, msg.0.transaction_id
+            )));
         }
         match &self.stream {
             Ok(t) => {
