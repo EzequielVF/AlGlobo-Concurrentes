@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
 
-use crate::{Log, Logger, PaqueteTuristico, PayProcNewPayment, PaymentProcessor};
+use crate::{Log, Logger, TouristPackage, PayProcNewPayment, PaymentProcessor};
 
 pub struct Reader {
     buffer: BufReader<File>,
@@ -66,7 +66,7 @@ impl Handler<LeerPaquete> for Reader {
 
         if aux.unwrap() > 0 {
             let paquete: Vec<&str> = buffer.split(',').collect();
-            let paquete_aux = PaqueteTuristico {
+            let paquete_aux = TouristPackage {
                 id: paquete[0].parse::<usize>().unwrap(),
                 precio: paquete[1].parse::<usize>().unwrap(),
             };
