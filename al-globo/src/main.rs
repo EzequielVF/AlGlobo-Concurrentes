@@ -10,10 +10,10 @@ use actix_rt::Arbiter;
 
 use crate::external_entity::ExternalEntity;
 use crate::logger::{Log, Logger};
-use crate::payment_processor::{PaqueteTuristico, PayProcNewPayment, PaymentProcessor};
+use crate::payment_processor::{TouristPackage, PayProcNewPayment, PaymentProcessor};
 use crate::reader::{LeerPaquete, Reader};
 
-mod comunicacion;
+mod communication;
 mod external_entity;
 mod logger;
 mod payment_processor;

@@ -8,7 +8,7 @@ use crate::external_entity::{
 use crate::{Log, Logger};
 
 #[derive(Clone)]
-pub struct PaqueteTuristico {
+pub struct TouristPackage {
     pub id: usize,
     pub precio: usize,
 }
@@ -53,7 +53,7 @@ impl Actor for PaymentProcessor {
 
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct PayProcNewPayment(pub PaqueteTuristico);
+pub struct PayProcNewPayment(pub TouristPackage);
 
 impl Handler<PayProcNewPayment> for PaymentProcessor {
     type Result = ();

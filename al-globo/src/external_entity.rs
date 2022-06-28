@@ -2,11 +2,11 @@ use std::net::TcpStream;
 
 use actix::{Actor, Addr, Context, Handler, Message};
 
-use crate::comunicacion::{
-    conectar_con_servidor, enviar_paquete, enviar_resultado, leer_respuesta,
+use crate::communication::{
+    connect_to_server, send_package, send_transaction_result, read_answer,
 };
 use crate::payment_processor::EntityAnswer;
-use crate::{Log, Logger, PaqueteTuristico, PaymentProcessor};
+use crate::{Log, Logger, TouristPackage, PaymentProcessor};
 
 pub struct ExternalEntity {
     name: String,
@@ -20,7 +20,7 @@ impl Actor for ExternalEntity {
 
 impl ExternalEntity {
     pub fn new(name: &str, ip: &str, port: &str, logger_address: Addr<Logger>) -> Self {
-        let channel = conectar_con_servidor(ip, port);
+        let channel = connect_to_server(ip, port);
         ExternalEntity {
             name: name.to_string(),
             stream: channel,
@@ -31,7 +31,7 @@ impl ExternalEntity {
 
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct ExtEntNewPayment(pub PaqueteTuristico, pub Addr<PaymentProcessor>);
+pub struct ExtEntNewPayment(pub TouristPackage, pub Addr<PaymentProcessor>);
 
 impl Handler<ExtEntNewPayment> for ExternalEntity {
     type Result = ();
@@ -40,12 +40,12 @@ impl Handler<ExtEntNewPayment> for ExternalEntity {
         match &self.stream {
             Ok(t) => {
                 let mut channel = t.try_clone().unwrap();
-                enviar_paquete(&mut channel, msg.0.clone(), &self.name);
+                send_package(&mut channel, msg.0.clone(), &self.name);
                 self.logger_address.do_send(Log(format!(
                     "[{}], Envio paquete de codigo {} para procesamiento",
                     self.name, msg.0.id
                 )));
-                let response = leer_respuesta(&mut t.try_clone().unwrap());
+                let response = read_answer(&mut t.try_clone().unwrap());
                 self.logger_address.do_send(Log(format!(
                     "[{}], Recibo respuesta paquete de codigo {} por parte del servidor",
                     self.name, msg.0.id
@@ -85,7 +85,7 @@ impl Handler<TransactionResultMessage> for ExternalEntity {
         match &self.stream {
             Ok(t) => {
                 let mut channel = t.try_clone().unwrap();
-                enviar_resultado(&mut channel, msg.0);
+                send_transaction_result(&mut channel, msg.0);
             }
             Err(_) => {}
         }
