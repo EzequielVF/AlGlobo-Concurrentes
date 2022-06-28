@@ -5,10 +5,10 @@ use crate::external_entity::TransactionResult;
 use crate::payment_processor::RequestState;
 use crate::TouristPackage;
 
-pub use self::Tipo::{Commit, Error, Pay, Rollback, Successful, Unknown};
+pub use self::Type::{Commit, Error, Pay, Rollback, Successful, Unknown};
 
 /// Respuesta recibidas por parte del servidor
-pub enum Tipo {
+pub enum Type {
     /// Ocurrió un error en el servidor
     Error,
     /// Mensaje de Pago
@@ -23,8 +23,8 @@ pub enum Tipo {
     Unknown,
 }
 
-impl From<u8> for Tipo {
-    fn from(code: u8) -> Tipo {
+impl From<u8> for Type {
+    fn from(code: u8) -> Type {
         match code & 0xF0 {
             0x00 => Pay,
             0x10 => Successful,
@@ -36,8 +36,8 @@ impl From<u8> for Tipo {
     }
 }
 
-impl From<Tipo> for u8 {
-    fn from(code: Tipo) -> u8 {
+impl From<Type> for u8 {
+    fn from(code: Type) -> u8 {
         match code {
             Pay => 0x00,
             Successful => 0x10,
@@ -157,7 +157,7 @@ pub fn read_answer(stream: &mut TcpStream) -> RequestState {
     let mut num_buffer = [0u8; 2];
     let _aux = stream.read_exact(&mut num_buffer);
 
-    match Tipo::from(num_buffer[0]) {
+    match Type::from(num_buffer[0]) {
         Successful => RequestState::Ok,
         Error => RequestState::Failed,
         _ => RequestState::Failed,

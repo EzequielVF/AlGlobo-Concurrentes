@@ -7,26 +7,44 @@ use crate::external_entity::{
 };
 use crate::{Log, Logger};
 
+/// Representación del paquete turístico a procesar
 #[derive(Clone)]
 pub struct TouristPackage {
+    /// id único de la transacción
     pub id: usize,
+    /// precio del paquete
     pub precio: usize,
 }
 
+/// Estado de una transacción
+/// - clave: nombre del servicio
+/// - valor: estado actual del _request_
 type TransactionState = HashMap<String, RequestState>;
 
+/// Procesador de pagos
 pub struct PaymentProcessor {
+    /// Dirección de Actor *Banco*
     bank_address: Addr<ExternalEntity>,
+    /// Dirección de Actor *Aerolínea*
     airline_address: Addr<ExternalEntity>,
+    /// Dirección de Actor *Hotel*
     hotel_address: Addr<ExternalEntity>,
+    /// Estado interno de las transacciones en proceso
+    /// - clave: id transacción
+    /// - valor: estado de los requests enviados a los servicios
     entity_answers: HashMap<usize, TransactionState>,
+    /// Dirección de Actor Banco
     logger_address: Addr<Logger>,
 }
 
+/// Estado de _request_ enviado a servicio externo
 #[derive(Debug, Clone, PartialEq)]
 pub enum RequestState {
+    /// Solicitud enviada
     Sent,
+    /// Solicitud exitosa
     Ok,
+    /// Solicitud con errores
     Failed,
 }
 
@@ -51,6 +69,7 @@ impl Actor for PaymentProcessor {
     type Context = Context<Self>;
 }
 
+/// Mensaje para procesar el pago de un nuevo Paquete Turístico
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct PayProcNewPayment(pub TouristPackage);
@@ -81,6 +100,7 @@ impl Handler<PayProcNewPayment> for PaymentProcessor {
     }
 }
 
+/// Mensaje para manejar la respuesta de los servicios externos
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct EntityAnswer(pub String, pub usize, pub RequestState);
@@ -99,11 +119,6 @@ impl Handler<EntityAnswer> for PaymentProcessor {
                 .iter()
                 .all(|(_n, state)| *state != RequestState::Sent)
             {
-                println!("[EntityAnswer] Recibí 3 respuestas");
-                transaction
-                    .iter()
-                    .for_each(|(n, s)| println!("[Hash] Name: {} - State: {:?}", n, s));
-
                 if transaction
                     .iter()
                     .all(|(_n, state)| *state == RequestState::Ok)

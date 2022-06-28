@@ -10,8 +10,8 @@ use actix_rt::Arbiter;
 
 use crate::external_entity::ExternalEntity;
 use crate::logger::{Log, Logger};
-use crate::payment_processor::{TouristPackage, PayProcNewPayment, PaymentProcessor};
-use crate::reader::{LeerPaquete, Reader};
+use crate::payment_processor::{PayProcNewPayment, PaymentProcessor, TouristPackage};
+use crate::reader::{ParseTouristPackage, Reader};
 
 mod communication;
 mod external_entity;
@@ -310,7 +310,7 @@ async fn main() {
             let reader_logger_address = logger_address.clone();
             let reader_execution = async move {
                 let reader_addr = Reader::new(FILE, pp_addr, reader_logger_address).start();
-                reader_addr.do_send(LeerPaquete());
+                reader_addr.do_send(ParseTouristPackage());
             };
             reader_arbiter.spawn(reader_execution);
 

@@ -7,9 +7,9 @@ use std::time::Duration;
 use rand::{thread_rng, Rng};
 
 use crate::logger::Logger;
-use crate::server::Tipo::{Commit, Rollback};
+use crate::server::Type::{Commit, Rollback};
 
-pub use self::Tipo::{Error, Pay, Successful, Unknown};
+pub use self::Type::{Error, Pay, Successful, Unknown};
 
 const ERROR: u8 = 1;
 
@@ -30,7 +30,7 @@ pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
         thread::Builder::new()
             .name("<<Cliente>>".into())
             .spawn(move || {
-                println!("Se lanzo un cliente!.");
+                println!("Se lanzó un cliente!");
                 read_packet_from_client(&mut client_stream, logger_clon);
             })
             .unwrap();
@@ -42,23 +42,23 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
         let mut num_buffer = [0u8; 2];
         match stream.read_exact(&mut num_buffer) {
             Ok(_) => {
-                let message_type = num_buffer[0].into(); //Primer byte es el tipo de mensaje
-                let size = num_buffer[1]; //El segundo es el tamaño
+                let message_type = num_buffer[0].into(); // Primer byte es el tipo de mensaje
+                let size = num_buffer[1]; // El segundo es el tamaño
 
-                let mut buffer_packet: Vec<u8> = vec![0; size as usize]; //Me creo un contenedor del tamaño q me dijeron
-                let _aux = stream.read_exact(&mut buffer_packet); //Leo lo que me dijeron que lea
+                let mut buffer_packet: Vec<u8> = vec![0; size as usize]; // Me creo un contenedor del tamaño q me dijeron
+                let _aux = stream.read_exact(&mut buffer_packet); // Leo lo que me dijeron que lea
                 match message_type {
                     Pay => {
                         let aux = read(buffer_packet);
                         logger.lock().unwrap().log(
                             format!(
-                                "<SERVER> Recibi una transacción de codigo {}, voy a procesarlo!",
+                                "<SERVER> Recibí una transacción de código {}, voy a procesarlo!",
                                 aux
                             )
                             .as_str(),
                         );
 
-                        if pago_es_correcto() {
+                        if successful_payment() {
                             println!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux);
                             send_successful_message(stream);
                         } else {
@@ -72,13 +72,13 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                     Commit => {
                         let aux = read(buffer_packet);
                         logger.lock().unwrap().log(
-                            format!("<SERVER> La operacion con ID:{} fue Commiteada", aux).as_str(),
+                            format!("<SERVER> La operación con ID:{} fue commiteada", aux).as_str(),
                         );
                     }
                     Rollback => {
                         let aux = read(buffer_packet);
                         logger.lock().unwrap().log(
-                            format!("<SERVER> La operacion con ID:{} fue RollBackeada!", aux)
+                            format!("<SERVER> La operación con ID:{} fue rollbackeada!", aux)
                                 .as_str(),
                         );
                     }
@@ -95,20 +95,20 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
     }
 }
 
-fn procesamiento_aleatorio() {
+fn random_duration_processing() {
     const FACTOR_TEMPORAL: u64 = 1;
     let ms = thread_rng().gen_range(2000, 5000);
     thread::sleep(Duration::from_millis(ms * FACTOR_TEMPORAL));
 }
 
-fn pago_es_correcto() -> bool {
-    const UMBRAL_ERROR: i32 = 500;
+fn successful_payment() -> bool {
+    const ERROR_THRESHOLD: i32 = 500;
 
-    procesamiento_aleatorio();
+    random_duration_processing();
 
-    let valor = thread_rng().gen_range(0, 1000);
+    let random_value = thread_rng().gen_range(0, 1000);
 
-    valor > UMBRAL_ERROR
+    random_value > ERROR_THRESHOLD
 }
 
 fn send_successful_message(stream: &mut TcpStream) {
@@ -145,13 +145,13 @@ fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
 fn read(buffer_packet: Vec<u8>) -> String {
     let mut _index = 0_usize;
 
-    let pago_size: usize = buffer_packet[(_index) as usize] as usize; //esto es asi porque los string en su primer byte tiene el tamaño, seguido del contenido
+    let pago_size: usize = buffer_packet[(_index) as usize] as usize; // esto es asi porque los string en su primer byte tiene el tamaño, seguido del contenido
     _index += 1;
 
     bytes2string(&buffer_packet[_index..(_index + pago_size)]).unwrap()
 }
 
-pub enum Tipo {
+pub enum Type {
     Error,
     Pay,
     Successful,
@@ -160,8 +160,8 @@ pub enum Tipo {
     Unknown,
 }
 
-impl From<u8> for Tipo {
-    fn from(code: u8) -> Tipo {
+impl From<u8> for Type {
+    fn from(code: u8) -> Type {
         match code & 0xF0 {
             0x00 => Pay,
             0x10 => Successful,
@@ -173,8 +173,8 @@ impl From<u8> for Tipo {
     }
 }
 
-impl From<Tipo> for u8 {
-    fn from(code: Tipo) -> u8 {
+impl From<Type> for u8 {
+    fn from(code: Type) -> u8 {
         match code {
             Pay => 0x00,
             Successful => 0x10,

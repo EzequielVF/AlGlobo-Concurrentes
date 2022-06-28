@@ -14,7 +14,7 @@ impl Logger {
         let log_file = OpenOptions::new()
             .write(true)
             .create(true)
-            .truncate(true) //si no queremos que borre sino que sume a lo que tiene lo remplazamos por .append(true)
+            .truncate(true) // si no queremos que borre sino que sume a lo que tiene lo remplazamos por .append(true)
             .open(filename)
             .expect("Error creando archivo de log");
 

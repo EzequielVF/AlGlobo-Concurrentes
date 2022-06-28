@@ -1,12 +1,11 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader};
-use std::thread;
-use std::time::Duration;
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
 
-use crate::{Log, Logger, TouristPackage, PayProcNewPayment, PaymentProcessor};
+use crate::{Log, Logger, PayProcNewPayment, PaymentProcessor, TouristPackage};
 
+/// Parser para archivo de paquetes turísticos
 pub struct Reader {
     buffer: BufReader<File>,
     pp_address: Addr<PaymentProcessor>,
@@ -53,32 +52,34 @@ impl Actor for Reader {
     type Context = Context<Self>;
 }
 
+/// Mensaje para solicitar al parser un nuevo paquete turístico
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct LeerPaquete();
+pub struct ParseTouristPackage();
 
-impl Handler<LeerPaquete> for Reader {
+impl Handler<ParseTouristPackage> for Reader {
     type Result = ();
 
-    fn handle(&mut self, _msg: LeerPaquete, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, _msg: ParseTouristPackage, ctx: &mut Context<Self>) -> Self::Result {
         let mut buffer = String::from("");
-        let aux = self.buffer.read_line(&mut buffer);
 
-        if aux.unwrap() > 0 {
-            let paquete: Vec<&str> = buffer.split(',').collect();
-            let paquete_aux = TouristPackage {
-                id: paquete[0].parse::<usize>().unwrap(),
-                precio: paquete[1].parse::<usize>().unwrap(),
+        if let Ok(_line) = self.buffer.read_line(&mut buffer) {
+            let splitted_package_line: Vec<&str> = buffer.split(',').collect();
+
+            let tourist_package = TouristPackage {
+                id: splitted_package_line[0].parse::<usize>().unwrap(),
+                precio: splitted_package_line[1].parse::<usize>().unwrap(),
             };
             self.logger_address.do_send(Log(format!(
-                "Se leyó paquete con id {}- y precio:{}",
-                paquete[0], paquete[1]
+                "Se leyó paquete con id {} - y precio: {}",
+                splitted_package_line[0], splitted_package_line[1]
             )));
-            self.pp_address.do_send(PayProcNewPayment(paquete_aux));
 
-            ctx.address().do_send(LeerPaquete());
+            self.pp_address.do_send(PayProcNewPayment(tourist_package));
 
-            thread::sleep(Duration::from_secs(1));
+            ctx.address().do_send(ParseTouristPackage());
+
+            // thread::sleep(Duration::from_secs(1));
         }
     }
 }

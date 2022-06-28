@@ -12,6 +12,7 @@ impl Actor for Logger {
     type Context = Context<Self>;
 }
 
+// Log para la escritura de mensajes informativos y de error
 impl Logger {
     pub fn new(name: &str) -> Self {
         let filename = format!("{}.log", name);
@@ -27,6 +28,7 @@ impl Logger {
     }
 }
 
+// Mensaje para realizar escritura en el _log_
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct Log(pub String);
