@@ -69,8 +69,8 @@ pub fn connect_to_server(ip: &str, port: &str) -> Result<TcpStream, std::io::Err
 }
 
 /// Envía el paquete turístico (`package`) por el socket (`stream`)
-pub fn send_package(stream: &mut TcpStream, package: TouristPackage, name: &str) {
-    let package_price = package.precio.to_string();
+pub fn send_package(stream: &mut TcpStream, transaction: Transaction, name: &str) {
+    let package_price = transaction.precio.to_string();
     let size = (package_price.len() + 1) as u8;
     let buffer = [Pay.into(), size];
 
@@ -108,7 +108,7 @@ pub fn send_package(stream: &mut TcpStream, package: TouristPackage, name: &str)
 /// ya sea *commit* o *rollback*.
 pub fn send_transaction_result(stream: &mut TcpStream, trans_result: TransactionResult) {
     let size = (trans_result.transaction_id.len() + 1) as u8;
-    let buffer = if trans_result.result {
+    let buffer = if trans_result.success {
         [Commit.into(), size]
     } else {
         [Rollback.into(), size]

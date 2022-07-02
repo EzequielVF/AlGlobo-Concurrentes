@@ -6,14 +6,14 @@ pub const ERROR: u8 = 1;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Answer {
     /// Solicitud enviada
-    Sent,
+    Pending,
     /// Solicitud exitosa
     Ok,
     /// Solicitud con errores
     Failed,
 }
 
-type TransactionAnswers = HashMap<String, Answer>;
+//type TransactionAnswers = HashMap<String, Answer>;
 
 /// Representación del paquete turístico a procesar
 #[derive(Clone)]
@@ -25,8 +25,8 @@ pub struct Transaction {
 }
 
 pub struct EntityAnswer {
-    pub entity_name: string,
-    pub transaction_id: usize,
+    pub entity_name: String,
+    pub transaction_id: String,
     pub answer: Answer
 }
 

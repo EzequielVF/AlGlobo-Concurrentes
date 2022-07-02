@@ -69,16 +69,16 @@ impl Handler<ParseTouristPackage> for Reader {
         if let Ok(_line) = self.buffer.read_line(&mut buffer) {
             let splitted_package_line: Vec<&str> = buffer.split(',').collect();
 
-            let tourist_package = Transaction {
-                id: splitted_package_line[0].parse::<usize>().unwrap(),
-                precio: splitted_package_line[1].parse::<usize>().unwrap(),
+            let transaction = Transaction {
+                id: splitted_package_line[0].to_string(),
+                precio: splitted_package_line[1].to_string(),
             };
             self.logger_address.do_send(Log(format!(
                 "Se leyó paquete con id {} - y precio: {}",
                 splitted_package_line[0], splitted_package_line[1]
             )));
 
-            self.pp_address.do_send(PayProcNewPayment(tourist_package));
+            self.pp_address.do_send(SendTransactionToEntities(transaction));
 
             ctx.address().do_send(ParseTouristPackage());
 
