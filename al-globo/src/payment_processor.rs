@@ -1,119 +1,99 @@
 use std::collections::HashMap;
+use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
+use crate::external_entity::{SendTransaction, ExternalEntity, TransactionResult, TransactionResultMessage};
+use crate::{Log, Logger, Writer};
+use crate::logger::Log;
+use crate::types::{EntityAnswer, Transaction};
 
-use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
-
-use crate::external_entity::{
-    ExtEntNewPayment, ExternalEntity, TransactionResult, TransactionResultMessage,
-};
-use crate::{Log, Logger};
-
-/// Representación del paquete turístico a procesar
-#[derive(Clone)]
-pub struct TouristPackage {
-    /// id único de la transacción
-    pub id: usize,
-    /// precio del paquete
-    pub precio: usize,
-}
-
-/// Estado de una transacción
-/// - clave: nombre del servicio
-/// - valor: estado actual del _request_
-type TransactionState = HashMap<String, RequestState>;
 
 /// Procesador de pagos
 pub struct PaymentProcessor {
     /// Dirección de Actor *Banco*
-    bank_address: Addr<ExternalEntity>,
+    bank_addr: Addr<ExternalEntity>,
     /// Dirección de Actor *Aerolínea*
-    airline_address: Addr<ExternalEntity>,
+    airline_addr: Addr<ExternalEntity>,
     /// Dirección de Actor *Hotel*
-    hotel_address: Addr<ExternalEntity>,
+    hotel_addr: Addr<ExternalEntity>,
+    /// Dirección de Actor Banco
+    logger_addr: Addr<Logger>,
+    /// Dirección de Actor de escritura de fallas
+    writer_addr: Addr<Writer>,
     /// Estado interno de las transacciones en proceso
     /// - clave: id transacción
     /// - valor: estado de los requests enviados a los servicios
     entity_answers: HashMap<usize, TransactionState>,
-    /// Dirección de Actor Banco
-    logger_address: Addr<Logger>,
-}
 
-/// Estado de _request_ enviado a servicio externo
-#[derive(Debug, Clone, PartialEq)]
-pub enum RequestState {
-    /// Solicitud enviada
-    Sent,
-    /// Solicitud exitosa
-    Ok,
-    /// Solicitud con errores
-    Failed,
 }
 
 impl PaymentProcessor {
     pub fn new(
-        bank_address: Addr<ExternalEntity>,
-        airline_address: Addr<ExternalEntity>,
-        hotel_address: Addr<ExternalEntity>,
-        logger: Addr<Logger>,
-    ) -> Self {
+        airline_addr: Addr<ExternalEntity>, bank_addr: Addr<ExternalEntity>,hotel_addr: Addr<ExternalEntity>,
+        writer_addr: Addr<Writer>, logger_addr: Addr<Logger>) -> Self {
         PaymentProcessor {
-            bank_address,
-            airline_address,
-            hotel_address,
-            entity_answers: HashMap::<usize, HashMap<String, RequestState>>::new(),
-            logger_address: logger,
+            bank_addr,
+            airline_addr,
+            hotel_addr,
+            logger_addr,
+            writer_addr,
+            entity_answers: HashMap::<usize, HashMap<String, TransactionState>::new()>,
         }
     }
 }
 
 impl Actor for PaymentProcessor {
-    type Context = Context<Self>;
+    type Context = SyncContext<Self>;
 }
 
-/// Mensaje para procesar el pago de un nuevo Paquete Turístico
+
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct PayProcNewPayment(pub TouristPackage);
+pub struct SendTransactionToEntities(pub Transaction);
 
-impl Handler<PayProcNewPayment> for PaymentProcessor {
+impl Handler<SendTransactionToEntities> for PaymentProcessor {
     type Result = ();
 
-    fn handle(&mut self, msg: PayProcNewPayment, ctx: &mut Context<Self>) -> Self::Result {
-        self.airline_address
-            .do_send(ExtEntNewPayment((msg.0).clone(), ctx.address()));
-        self.bank_address
-            .do_send(ExtEntNewPayment((msg.0).clone(), ctx.address()));
-        self.hotel_address
-            .do_send(ExtEntNewPayment((msg.0).clone(), ctx.address()));
+    fn handle(&mut self, msg: SendTransactionToEntities, ctx: &mut Context<Self>) -> Self::Result {
+        let transaction = msg.0;
 
-        self.entity_answers.insert(
-            msg.0.id,
-            HashMap::from([
-                ("BANK".to_string(), RequestState::Sent),
-                ("AIRLINE".to_string(), RequestState::Sent),
-                ("HOTEL".to_string(), RequestState::Sent),
-            ]),
-        );
-        self.logger_address.do_send(Log(format!(
-            "Se envía paquete de id {} a entidades para procesamiento",
-            msg.0.id
-        )));
+        self.airline_addr.do_send(SendTransaction((transaction).clone(), ctx.address()));
+        self.bank_addr.do_send(SendTransaction((transaction).clone(), ctx.address()));
+        self.hotel_addr.do_send(SendTransaction((transaction).clone(), ctx.address()));
+
+        self.entity_answers.insert(transaction.id, HashMap::from([
+                        ("BANK".to_string(), RequestState::Sent),
+                        ("AIRLINE".to_string(), RequestState::Sent),
+                        ("HOTEL".to_string(), RequestState::Sent),
+        ]));
+
+        self.logger_addr.do_send(Log(format!("Se envía paquete de id {} a entidades para procesamiento", transaction.id)));
     }
 }
 
 /// Mensaje para manejar la respuesta de los servicios externos
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct EntityAnswer(pub String, pub usize, pub RequestState);
+pub struct ProcessEntityAnswer(pub EntityAnswer);
 
-impl Handler<EntityAnswer> for PaymentProcessor {
+impl Handler<ProcessEntityAnswer> for PaymentProcessor {
     type Result = ();
 
-    fn handle(&mut self, msg: EntityAnswer, _ctx: &mut Context<Self>) -> Self::Result {
-        let transaction_id = &msg.1;
-        if let Some(transaction) = self.entity_answers.get_mut(transaction_id) {
-            transaction.insert(msg.0.clone(), msg.2.clone());
-            self.logger_address
-                .do_send(Log(format!("[{}-ID:{}-Estado:{:?}]", msg.0, msg.1, msg.2)));
+    fn handle(&mut self, msg: ProcessEntityAnswer, _ctx: &mut Context<Self>) -> Self::Result {
+       let entity_answer = msg.0;
+
+        if let Some(transaction_answers) = self.entity_answers.get_mut(&entity_answer.transaction_id) {
+
+            transaction_answers.insert(entity_answer.entity_name, entity_answer.answer);
+
+            self.logger_addr.do_send(
+                Log(format!("Se registra respuesta de entidad {} para transacción de id {} con \
+                resultado: {:?}", entity_answer.entity_name, entity_answer.transaction_id, entity_answer.answer)
+            ));
+
+
+
+
+
+
 
             if transaction
                 .iter()
@@ -128,11 +108,11 @@ impl Handler<EntityAnswer> for PaymentProcessor {
                         result: true,
                     };
 
-                    self.airline_address
+                    self.airline_addr
                         .do_send(TransactionResultMessage(transaction_result.clone()));
-                    self.bank_address
+                    self.bank_addr
                         .do_send(TransactionResultMessage(transaction_result.clone()));
-                    self.hotel_address
+                    self.hotel_addr
                         .do_send(TransactionResultMessage(transaction_result));
                 } else {
                     let transaction_result: TransactionResult = TransactionResult {
@@ -143,22 +123,22 @@ impl Handler<EntityAnswer> for PaymentProcessor {
                         if *state == RequestState::Ok {
                             match service.as_str() {
                                 "AIRLINE" => {
-                                    self.airline_address.do_send(TransactionResultMessage(
+                                    self.airline_addr.do_send(TransactionResultMessage(
                                         transaction_result.clone(),
                                     ));
                                 }
                                 "BANK" => {
-                                    self.bank_address.do_send(TransactionResultMessage(
+                                    self.bank_addr.do_send(TransactionResultMessage(
                                         transaction_result.clone(),
                                     ));
                                 }
                                 "HOTEL" => {
-                                    self.hotel_address.do_send(TransactionResultMessage(
+                                    self.hotel_addr.do_send(TransactionResultMessage(
                                         transaction_result.clone(),
                                     ));
                                 }
                                 _ => {
-                                    self.logger_address
+                                    self.logger_addr
                                         .do_send(Log("No debería suceder esto".to_string()));
                                 }
                             }

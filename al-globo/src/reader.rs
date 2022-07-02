@@ -4,6 +4,8 @@ use std::io::{BufRead, BufReader};
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
 
 use crate::{Log, Logger, PayProcNewPayment, PaymentProcessor, TouristPackage};
+use crate::logger::Log;
+use crate::types::Transaction;
 
 /// Parser para archivo de paquetes turísticos
 pub struct Reader {
@@ -41,7 +43,7 @@ impl Reader {
     }
 }
 
-fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Error> {
+pub fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Error> {
     match File::open(ruta) {
         Ok(archivo_pagos) => Ok(BufReader::new(archivo_pagos)),
         Err(err) => Err(err),
@@ -66,7 +68,7 @@ impl Handler<ParseTouristPackage> for Reader {
         if let Ok(_line) = self.buffer.read_line(&mut buffer) {
             let splitted_package_line: Vec<&str> = buffer.split(',').collect();
 
-            let tourist_package = TouristPackage {
+            let tourist_package = Transaction {
                 id: splitted_package_line[0].parse::<usize>().unwrap(),
                 precio: splitted_package_line[1].parse::<usize>().unwrap(),
             };

@@ -1,7 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-
-use actix::{Actor, Context, Handler, Message};
+use actix::{Actor, Addr, Handler, SyncContext, Message, Context};
 use chrono::Local;
 
 pub struct Logger {
@@ -9,7 +8,7 @@ pub struct Logger {
 }
 
 impl Actor for Logger {
-    type Context = Context<Self>;
+    type Context = SyncContext<Self>;
 }
 
 // Log para la escritura de mensajes informativos y de error
@@ -37,8 +36,9 @@ impl Handler<Log> for Logger {
     type Result = ();
 
     fn handle(&mut self, msg: Log, _ctx: &mut Context<Self>) -> Self::Result {
+        let message = msg.0;
         let time = Local::now().to_string();
-        let message = format!("[{}] - {}\n", time, msg.0);
+        let message = format!("[{}] - {}\n", time, message);
         self.file
             .write_all(message.as_bytes())
             .expect("Error escribiendo archivo de log");
