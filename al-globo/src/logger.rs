@@ -35,7 +35,7 @@ pub struct Log(pub String);
 impl Handler<Log> for Logger {
     type Result = ();
 
-    fn handle(&mut self, msg: Log, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Log, _ctx: &mut SyncContext<Self>) -> Self::Result {
         let message = msg.0;
         let time = Local::now().to_string();
         let message = format!("[{}] - {}\n", time, message);

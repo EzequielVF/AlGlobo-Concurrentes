@@ -46,10 +46,11 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                 let size = num_buffer[1]; // El segundo es el tamaño
 
                 let mut buffer_packet: Vec<u8> = vec![0; size as usize]; // Me creo un contenedor del tamaño q me dijeron
-                let _aux = stream.read_exact(&mut buffer_packet); // Leo lo que me dijeron que lea
+                let _bytes_read = stream.read_exact(&mut buffer_packet); // Leo lo que me dijeron que lea
+                let mut aux = String::new();
                 match message_type {
                     Pay => {
-                        let aux = read(buffer_packet);
+                        aux = read(buffer_packet);
                         logger.lock().unwrap().log(
                             format!(
                                 "<SERVER> Recibí una transacción de código {}, voy a procesarlo!",
@@ -60,13 +61,13 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
 
                         if successful_payment() {
                             println!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux);
-                            send_successful_message(stream);
+                            send_message(stream, aux, true);
                         } else {
                             println!(
                                 "<SERVER> Tuvimos un problema al validar el pago de {}$.",
                                 aux
                             );
-                            send_error_message(stream);
+                            send_message(stream, aux, false);
                         }
                     }
                     Commit => {
@@ -111,29 +112,42 @@ fn successful_payment() -> bool {
     random_value > ERROR_THRESHOLD
 }
 
-fn send_successful_message(stream: &mut TcpStream) {
-    let buffer = [Successful.into(), 0_u8];
+#[doc(hidden)]
+fn push_to_buffer(buffer: &mut Vec<u8>, data: String) {
+    buffer.push(data.len() as u8);
+    buffer.extend_from_slice(data.as_bytes());
+}
+
+fn send_message(stream: &mut TcpStream, id: String, estado: bool) {
+    let size = (id.len() + 1) as u8;
+    let mut buffer= [Error.into(), size];
+    if estado {
+        buffer = [Successful.into(), size];
+    }
     match stream.write_all(&buffer) {
         Ok(_) => {
-            println!("<SERVER> Mensaje enviado correctamente!");
+            println!("<SERVER> Cabecera enviada correctamente!");
         }
         Err(_) => {
-            println!("<SERVER> Hubo un problema al intentar mandar un mensaje al cliente!")
+            println!("<SERVER> Hubo un problema al intentar mandar a cabecera al cliente!")
+        }
+    }
+
+    let mut send_buffer: Vec<u8> = Vec::with_capacity(size.into());
+    push_to_buffer(&mut send_buffer, id.clone());
+    match stream.write(&send_buffer) {
+        Ok(_) => {
+            println!(
+                "Mensaje (id: {}) enviado correctamente!",
+                 id
+            );
+        }
+        Err(_) => {
+            println!("No me pude contactar con el cliente!");
         }
     }
 }
 
-fn send_error_message(stream: &mut TcpStream) {
-    let buffer = [Error.into(), 0_u8];
-    match stream.write_all(&buffer) {
-        Ok(_) => {
-            println!("<SERVER> Mensaje enviado correctamente!");
-        }
-        Err(_) => {
-            println!("<SERVER> Hubo un problema al intentar mandar un mensaje al cliente!")
-        }
-    }
-}
 
 fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
     match std::str::from_utf8(bytes) {

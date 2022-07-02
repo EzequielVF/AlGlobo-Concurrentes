@@ -1,6 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Write};
-use actix::{Actor, Addr, Context, Handler, SyncContext};
+use actix::{Actor, Addr, Handler, SyncContext, Message, Context};
 use crate::Logger;
 use crate::reader::abrir_archivo_paquetes;
 use crate::types::Transaction;
@@ -17,7 +17,7 @@ impl Actor for Writer {
 impl Writer {
     pub fn new(path: &str, addr: Addr<Logger>) -> Self {
 
-        let filename = format!("{}.log", name);
+        let filename = format!("fails.csv");
         let file = OpenOptions::new()
             .write(true)
             .create(true)
@@ -33,12 +33,12 @@ impl Writer {
 
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct WriteErrorTransaction(pub Transaction);
+pub struct WriteTransaction(pub Transaction);
 
-impl Handler<WriteErrorTransaction> for Writer {
+impl Handler<WriteTransaction> for Writer {
     type Result = ();
 
-    fn handle(&mut self, msg: WriteErrorTransaction, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: WriteTransaction, _ctx: &mut SyncContext<Self>) -> Self::Result {
         let transaction = msg.0;
         let message = format!("{},{}\n", transaction.id, transaction.precio);
         self.file

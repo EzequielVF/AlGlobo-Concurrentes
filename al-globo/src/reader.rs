@@ -3,19 +3,20 @@ use std::io::{BufRead, BufReader};
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
 
-use crate::{Log, Logger, PayProcNewPayment, PaymentProcessor, TouristPackage};
+use crate::{Logger, TransactionManager};
 use crate::logger::Log;
+use crate::transaction_manager::SendTransactionToEntities;
 use crate::types::Transaction;
 
 /// Parser para archivo de paquetes turísticos
 pub struct Reader {
     buffer: BufReader<File>,
-    pp_address: Addr<PaymentProcessor>,
+    pp_address: Addr<TransactionManager>,
     logger_address: Addr<Logger>,
 }
 
 impl Reader {
-    pub fn new(path: &str, addr: Addr<PaymentProcessor>, addr_log: Addr<Logger>) -> Self {
+    pub fn new(path: &str, addr: Addr<TransactionManager>, addr_log: Addr<Logger>) -> Self {
         let t = abrir_archivo_paquetes(path);
         match t {
             Ok(b) => Reader {

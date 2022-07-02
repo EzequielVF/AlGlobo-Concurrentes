@@ -1,19 +1,19 @@
 use std::collections::HashMap;
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
-use crate::external_entity::{SendTransaction, ExternalEntity, TransactionResult, TransactionResultMessage};
-use crate::{Log, Logger, Writer};
+use crate::{Logger, Writer};
+use crate::external_entity_sender::{ExternalEntitySender, SendTransactionToServer, SendConfirmationOrRollbackToServer};
 use crate::logger::Log;
 use crate::types::{EntityAnswer, Transaction};
 
 
 /// Procesador de pagos
-pub struct PaymentProcessor {
+pub struct TransactionManager {
     /// Dirección de Actor *Banco*
     bank_addr: Addr<ExternalEntity>,
     /// Dirección de Actor *Aerolínea*
-    airline_addr: Addr<ExternalEntity>,
+    airline_addr: Addr<ExternalEntitySender>,
     /// Dirección de Actor *Hotel*
-    hotel_addr: Addr<ExternalEntity>,
+    hotel_addr: Addr<ExternalEntitySender>,
     /// Dirección de Actor Banco
     logger_addr: Addr<Logger>,
     /// Dirección de Actor de escritura de fallas
@@ -25,11 +25,11 @@ pub struct PaymentProcessor {
 
 }
 
-impl PaymentProcessor {
+impl TransactionManager {
     pub fn new(
         airline_addr: Addr<ExternalEntity>, bank_addr: Addr<ExternalEntity>,hotel_addr: Addr<ExternalEntity>,
         writer_addr: Addr<Writer>, logger_addr: Addr<Logger>) -> Self {
-        PaymentProcessor {
+        TransactionManager {
             bank_addr,
             airline_addr,
             hotel_addr,
@@ -40,7 +40,7 @@ impl PaymentProcessor {
     }
 }
 
-impl Actor for PaymentProcessor {
+impl Actor for TransactionManager {
     type Context = SyncContext<Self>;
 }
 
@@ -49,20 +49,20 @@ impl Actor for PaymentProcessor {
 #[rtype(result = "()")]
 pub struct SendTransactionToEntities(pub Transaction);
 
-impl Handler<SendTransactionToEntities> for PaymentProcessor {
+impl Handler<SendTransactionToEntities> for TransactionManager {
     type Result = ();
 
-    fn handle(&mut self, msg: SendTransactionToEntities, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: SendTransactionToEntities, ctx: &mut SyncContext<Self>) -> Self::Result {
         let transaction = msg.0;
 
         self.airline_addr.do_send(SendTransaction((transaction).clone(), ctx.address()));
         self.bank_addr.do_send(SendTransaction((transaction).clone(), ctx.address()));
         self.hotel_addr.do_send(SendTransaction((transaction).clone(), ctx.address()));
 
-        self.entity_answers.insert(transaction.id, HashMap::from([
-                        ("BANK".to_string(), RequestState::Sent),
-                        ("AIRLINE".to_string(), RequestState::Sent),
-                        ("HOTEL".to_string(), RequestState::Sent),
+        self.entity_answers.insert(transaction.id.clone(), HashMap::from([
+                        ("BANK".to_string(), Answer::Pending),
+                        ("AIRLINE".to_string(), Answer::Pending),
+                        ("HOTEL".to_string(), Answer::Pending),
         ]));
 
         self.logger_addr.do_send(Log(format!("Se envía paquete de id {} a entidades para procesamiento", transaction.id)));
@@ -74,11 +74,11 @@ impl Handler<SendTransactionToEntities> for PaymentProcessor {
 #[rtype(result = "()")]
 pub struct ProcessEntityAnswer(pub EntityAnswer);
 
-impl Handler<ProcessEntityAnswer> for PaymentProcessor {
+impl Handler<ProcessEntityAnswer> for TransactionManager {
     type Result = ();
 
-    fn handle(&mut self, msg: ProcessEntityAnswer, _ctx: &mut Context<Self>) -> Self::Result {
-       let entity_answer = msg.0;
+    fn handle(&mut self, msg: ProcessEntityAnswer, _ctx: &mut SyncContext<Self>) -> Self::Result {
+        let entity_answer = msg.0;
 
         if let Some(transaction_answers) = self.entity_answers.get_mut(&entity_answer.transaction_id) {
 

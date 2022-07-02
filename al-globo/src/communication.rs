@@ -1,9 +1,7 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
-use crate::external_entity::TransactionResult;
-use crate::payment_processor::RequestState;
-use crate::TouristPackage;
+use crate::types::{ERROR, ServerResponse, Transaction, TransactionResult};
 
 pub use self::Type::{Commit, Error, Pay, Rollback, Successful, Unknown};
 
@@ -80,7 +78,7 @@ pub fn send_package(stream: &mut TcpStream, package: TouristPackage, name: &str)
         Ok(_) => {
             println!(
                 "<{}> Mensaje (id: {}) enviado correctamente!",
-                name, package.id
+                name, transaction.id
             );
         }
         Err(_) => {
@@ -96,11 +94,11 @@ pub fn send_package(stream: &mut TcpStream, package: TouristPackage, name: &str)
         Ok(_) => {
             println!(
                 "<{}> Mensaje (id: {}) enviado correctamente!",
-                name, package.id
+                name, transaction.id
             );
         }
         Err(_) => {
-            println!("<{}> No me pude contactar con el banco!", name);
+            println!("<{}> No me pude contactar con la entidad!", name);
         }
     }
 }
@@ -147,19 +145,49 @@ pub fn send_transaction_result(stream: &mut TcpStream, trans_result: Transaction
 #[doc(hidden)]
 fn push_to_buffer(buffer: &mut Vec<u8>, data: String) {
     buffer.push(data.len() as u8);
-
     buffer.extend_from_slice(data.as_bytes());
 }
 
 /// Recibe el resultado de la operación por parte del servicio solicitado
 /// y mapea el resultado a `RequestState`
-pub fn read_answer(stream: &mut TcpStream) -> RequestState {
+pub fn read_answer(stream: &mut TcpStream) -> ServerResponse {
     let mut num_buffer = [0u8; 2];
     let _aux = stream.read_exact(&mut num_buffer);
+    let size = num_buffer[1];
+
+    let mut buffer_packet: Vec<u8> = vec![0; size as usize];
+    let _bytes_read = stream.read_exact(&mut buffer_packet);
+    let mut aux = String::new();
+
+    aux = read(buffer_packet);
+    let mut response = ServerResponse {
+        transaction_id : aux,
+        response: false,
+    };
 
     match Type::from(num_buffer[0]) {
-        Successful => RequestState::Ok,
-        Error => RequestState::Failed,
-        _ => RequestState::Failed,
+        Successful => {
+            response.response = true;
+        }
+        _ => {
+        }
+    }
+    return response;
+}
+
+fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
+    match std::str::from_utf8(bytes) {
+        Ok(str) => Ok(str.to_owned()),
+        Err(_) => Err(ERROR),
     }
 }
+
+fn read(buffer_packet: Vec<u8>) -> String {
+    let mut _index = 0_usize;
+
+    let pago_size: usize = buffer_packet[(_index) as usize] as usize; // esto es asi porque los string en su primer byte tiene el tamaño, seguido del contenido
+    _index += 1;
+
+    bytes2string(&buffer_packet[_index..(_index + pago_size)]).unwrap()
+}
+
