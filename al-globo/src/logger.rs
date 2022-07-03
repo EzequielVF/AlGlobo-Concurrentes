@@ -1,7 +1,7 @@
+use actix::{Actor, Addr, Context, Handler, Message, SyncContext};
+use chrono::Local;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use actix::{Actor, Addr, Handler, SyncContext, Message, Context};
-use chrono::Local;
 
 pub struct Logger {
     file: File,

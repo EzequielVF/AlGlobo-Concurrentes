@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
-use crate::types::{ERROR, ServerResponse, Transaction, TransactionResult};
+use crate::types::{ServerResponse, Transaction, TransactionResult, ERROR};
 
 pub use self::Type::{Commit, Error, Pay, Rollback, Successful, Unknown};
 
@@ -50,20 +50,18 @@ impl From<Type> for u8 {
 /// Realiza la conexión al servidor indicado en ip y puerto (`port`).
 /// Si fue exitosa, devuelve el socket creado,
 /// si no, retorna el `Err`
-pub fn connect_to_server(ip: &str, port: &str) -> Result<TcpStream, std::io::Error> {
+pub fn connect_to_server(ip: &str, port: &str) -> Result<TcpStream, &'static str> {
     let address = format!("{}:{}", ip, port);
-    println!("<CLIENTE> Intentando establecer conexión con: {}", address);
+    println!("[CLIENTE] Intentando establecer conexión con: {}", address);
 
-    let stream = TcpStream::connect(address);
-
-    match stream {
+    match TcpStream::connect(address) {
         Ok(stream) => {
             println!("Conectado exitosamente");
             Ok(stream)
         }
         Err(e) => {
-            println!("No me pude conectar!");
-            Err(e)
+            eprintln!("{}", e.to_string());
+            Err("No me pude conectar")
         }
     }
 }
@@ -161,7 +159,7 @@ pub fn read_answer(stream: &mut TcpStream) -> ServerResponse {
 
     aux = read(buffer_packet);
     let mut response = ServerResponse {
-        transaction_id : aux,
+        transaction_id: aux,
         response: false,
     };
 
@@ -169,8 +167,7 @@ pub fn read_answer(stream: &mut TcpStream) -> ServerResponse {
         Successful => {
             response.response = true;
         }
-        _ => {
-        }
+        _ => {}
     }
     return response;
 }
@@ -190,4 +187,3 @@ fn read(buffer_packet: Vec<u8>) -> String {
 
     bytes2string(&buffer_packet[_index..(_index + pago_size)]).unwrap()
 }
-

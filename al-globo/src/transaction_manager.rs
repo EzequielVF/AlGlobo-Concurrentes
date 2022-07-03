@@ -1,11 +1,12 @@
-use std::collections::HashMap;
-use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
-use crate::{Logger, Writer};
-use crate::external_entity_sender::{ExternalEntitySender, SendTransactionToServer, SendConfirmationOrRollbackToServer};
+use crate::external_entity_sender::{
+    ExternalEntitySender, SendConfirmationOrRollbackToServer, SendTransactionToServer,
+};
 use crate::logger::Log;
 use crate::types::{Answer, EntityAnswer, Transaction, TransactionResult};
 use crate::writer::WriteTransaction;
-
+use crate::{Logger, Writer};
+use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
+use std::collections::HashMap;
 
 /// Procesador de pagos
 pub struct TransactionManager {
@@ -23,14 +24,17 @@ pub struct TransactionManager {
     /// - clave: id transacción
     /// - valor: estado de los requests enviados a los servicios
     entity_answers: HashMap<String, HashMap<String, Answer>>,
-    transactions: HashMap<String, Transaction>
-
+    transactions: HashMap<String, Transaction>,
 }
 
 impl TransactionManager {
     pub fn new(
-        airline_addr: Addr<ExternalEntitySender>, bank_addr: Addr<ExternalEntitySender>,hotel_addr: Addr<ExternalEntitySender>,
-        writer_addr: Addr<Writer>, logger_addr: Addr<Logger>) -> Self {
+        airline_addr: Addr<ExternalEntitySender>,
+        bank_addr: Addr<ExternalEntitySender>,
+        hotel_addr: Addr<ExternalEntitySender>,
+        logger_addr: Addr<Logger>,
+        writer_addr: Addr<Writer>,
+    ) -> Self {
         TransactionManager {
             bank_addr,
             airline_addr,
@@ -38,7 +42,7 @@ impl TransactionManager {
             logger_addr,
             writer_addr,
             entity_answers: HashMap::<String, HashMap<String, Answer>>::new(),
-            transactions: HashMap::<String, Transaction>::new()
+            transactions: HashMap::<String, Transaction>::new(),
         }
     }
 }
@@ -55,23 +59,42 @@ pub struct SendTransactionToEntities(pub Transaction);
 impl Handler<SendTransactionToEntities> for TransactionManager {
     type Result = ();
 
-    fn handle(&mut self, msg: SendTransactionToEntities, ctx: &mut SyncContext<Self>) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: SendTransactionToEntities,
+        ctx: &mut SyncContext<Self>,
+    ) -> Self::Result {
         let transaction = msg.0;
-        self.transactions.insert(transaction.id.clone(), transaction.clone());
+        self.transactions
+            .insert(transaction.id.clone(), transaction.clone());
 
-        self.airline_addr.do_send(SendTransactionToServer((transaction).clone(), ctx.address()));
-        self.bank_addr.do_send(SendTransactionToServer((transaction).clone(), ctx.address()));
-        self.hotel_addr.do_send(SendTransactionToServer((transaction).clone(), ctx.address()));
+        self.airline_addr.do_send(SendTransactionToServer(
+            (transaction).clone(),
+            ctx.address(),
+        ));
+        self.bank_addr.do_send(SendTransactionToServer(
+            (transaction).clone(),
+            ctx.address(),
+        ));
+        self.hotel_addr.do_send(SendTransactionToServer(
+            (transaction).clone(),
+            ctx.address(),
+        ));
 
-        self.entity_answers.insert(transaction.id.clone(), HashMap::from([
-                        ("BANK".to_string(), Answer::Pending),
-                        ("AIRLINE".to_string(), Answer::Pending),
-                        ("HOTEL".to_string(), Answer::Pending),
-        ]));
-        self.logger_addr.do_send(Log(format!("Se envía paquete de id {} a entidades para procesamiento", transaction.id)));
+        self.entity_answers.insert(
+            transaction.id.clone(),
+            HashMap::from([
+                ("BANK".to_string(), Answer::Pending),
+                ("AIRLINE".to_string(), Answer::Pending),
+                ("HOTEL".to_string(), Answer::Pending),
+            ]),
+        );
+        self.logger_addr.do_send(Log(format!(
+            "Se envía paquete de id {} a entidades para procesamiento",
+            transaction.id
+        )));
     }
 }
-
 
 /// Mensaje para manejar la respuesta de los servicios externos/// Mensaje para procesar respuesta de servicios externos
 #[derive(Message)]
@@ -84,19 +107,28 @@ impl Handler<ProcessEntityAnswer> for TransactionManager {
     fn handle(&mut self, msg: ProcessEntityAnswer, _ctx: &mut SyncContext<Self>) -> Self::Result {
         let entity_answer = msg.0;
 
-        if let Some(transaction_answers) = self.entity_answers.get_mut(&entity_answer.transaction_id) {
-            transaction_answers.insert(entity_answer.entity_name.clone(), entity_answer.answer.clone());
+        if let Some(transaction_answers) =
+            self.entity_answers.get_mut(&entity_answer.transaction_id)
+        {
+            transaction_answers.insert(
+                entity_answer.entity_name.clone(),
+                entity_answer.answer.clone(),
+            );
 
-            self.logger_addr.do_send(
-                Log(format!("Se registra respuesta de entidad {} para transacción de id {} con \
-                resultado: {:?}", entity_answer.entity_name, entity_answer.transaction_id, entity_answer.answer)
-                ));
+            self.logger_addr.do_send(Log(format!(
+                "Se registra respuesta de entidad {} para transacción de id {} con \
+                resultado: {:?}",
+                entity_answer.entity_name, entity_answer.transaction_id, entity_answer.answer
+            )));
 
-
-            let completed: bool = transaction_answers.iter().all(|(_n, state)| *state != Answer::Pending);
+            let completed: bool = transaction_answers
+                .iter()
+                .all(|(_n, state)| *state != Answer::Pending);
 
             if completed {
-                let ok_entities = transaction_answers.iter().filter(|(_n, state)| *state == &Answer::Ok);
+                let ok_entities = transaction_answers
+                    .iter()
+                    .filter(|(_n, state)| *state == &Answer::Ok);
 
                 let mut transaction_result = TransactionResult {
                     transaction_id: entity_answer.transaction_id.clone(),
@@ -104,16 +136,23 @@ impl Handler<ProcessEntityAnswer> for TransactionManager {
                 };
                 let mut message_type = "commit";
 
-                    let has_fails: bool = transaction_answers.iter().all(|(_n, state)| *state !=Answer::Ok);
+                let has_fails: bool = transaction_answers
+                    .iter()
+                    .any(|(_n, state)| *state == Answer::Failed);
 
                 if has_fails {
                     transaction_result.success = false;
                     message_type = "rollback";
-                    if let Some(transaction) = self.transactions.get(entity_answer.transaction_id.as_str()) {
-                        self.writer_addr.do_send(WriteTransaction(transaction.clone()));
-                        self.logger_addr.do_send(Log(format!("Se escribe transacción de id {} en archivo de fallas",transaction.id)));
+                    if let Some(transaction) =
+                        self.transactions.get(entity_answer.transaction_id.as_str())
+                    {
+                        self.writer_addr
+                            .do_send(WriteTransaction(transaction.clone()));
+                        self.logger_addr.do_send(Log(format!(
+                            "Se escribe transacción de id {} en archivo de fallas",
+                            transaction.id
+                        )));
                     }
-
                 }
 
                 ok_entities.for_each(|(entity_name, Answer)| {

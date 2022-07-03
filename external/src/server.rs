@@ -120,7 +120,7 @@ fn push_to_buffer(buffer: &mut Vec<u8>, data: String) {
 
 fn send_message(stream: &mut TcpStream, id: String, estado: bool) {
     let size = (id.len() + 1) as u8;
-    let mut buffer= [Error.into(), size];
+    let mut buffer = [Error.into(), size];
     if estado {
         buffer = [Successful.into(), size];
     }
@@ -137,17 +137,13 @@ fn send_message(stream: &mut TcpStream, id: String, estado: bool) {
     push_to_buffer(&mut send_buffer, id.clone());
     match stream.write(&send_buffer) {
         Ok(_) => {
-            println!(
-                "Mensaje (id: {}) enviado correctamente!",
-                 id
-            );
+            println!("Mensaje (id: {}) enviado correctamente!", id);
         }
         Err(_) => {
             println!("No me pude contactar con el cliente!");
         }
     }
 }
-
 
 fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
     match std::str::from_utf8(bytes) {

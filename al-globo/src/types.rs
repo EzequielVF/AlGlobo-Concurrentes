@@ -27,7 +27,7 @@ pub struct Transaction {
 pub struct EntityAnswer {
     pub entity_name: String,
     pub transaction_id: String,
-    pub answer: Answer
+    pub answer: Answer,
 }
 
 /// Representación de la respuesta del pago enviado
@@ -40,5 +40,5 @@ pub struct TransactionResult {
 
 pub struct ServerResponse {
     pub transaction_id: String,
-    pub response: bool
+    pub response: bool,
 }

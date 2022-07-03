@@ -1,10 +1,12 @@
-use actix::prelude::*;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Write};
-use actix::{Actor, Addr, Handler, SyncContext, Message, Context};
-use crate::Logger;
+
+use actix::prelude::*;
+use actix::{Actor, Addr, Context, Handler, Message, SyncContext};
+
 use crate::reader::abrir_archivo_paquetes;
 use crate::types::Transaction;
+use crate::Logger;
 
 pub struct Writer {
     file: File,
@@ -17,17 +19,15 @@ impl Actor for Writer {
 
 impl Writer {
     pub fn new(path: &str, addr: Addr<Logger>) -> Self {
-
-        let filename = format!("fails.csv");
         let file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(filename)
-            .expect("Error creando archivo de log");
+            .open(path)
+            .expect("Error creando archivo de fallas");
         Writer {
             file: file,
-            logger_address: addr
+            logger_address: addr,
         }
     }
 }

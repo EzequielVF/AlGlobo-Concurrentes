@@ -1,12 +1,12 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader};
 
-use actix::{Actor, Addr, AsyncContext, Context, Handler, Message};
+use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
 
-use crate::{Logger, TransactionManager};
 use crate::logger::Log;
 use crate::transaction_manager::SendTransactionToEntities;
 use crate::types::Transaction;
+use crate::{Logger, TransactionManager};
 
 /// Parser para archivo de paquetes turísticos
 pub struct Reader {
@@ -52,7 +52,7 @@ pub fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Er
 }
 
 impl Actor for Reader {
-    type Context = Context<Self>;
+    type Context = SyncContext<Self>;
 }
 
 /// Mensaje para solicitar al parser un nuevo paquete turístico
@@ -63,7 +63,11 @@ pub struct ParseTouristPackage();
 impl Handler<ParseTouristPackage> for Reader {
     type Result = ();
 
-    fn handle(&mut self, _msg: ParseTouristPackage, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(
+        &mut self,
+        _msg: ParseTouristPackage,
+        ctx: &mut <Reader as Actor>::Context,
+    ) -> Self::Result {
         let mut buffer = String::from("");
 
         if let Ok(_line) = self.buffer.read_line(&mut buffer) {
@@ -78,7 +82,8 @@ impl Handler<ParseTouristPackage> for Reader {
                 splitted_package_line[0], splitted_package_line[1]
             )));
 
-            self.pp_address.do_send(SendTransactionToEntities(transaction));
+            self.pp_address
+                .do_send(SendTransactionToEntities(transaction));
 
             ctx.address().do_send(ParseTouristPackage());
 

@@ -10,25 +10,25 @@ use serde_json;
 #[derive(Deserialize, Debug)]
 struct ExternalEntityConfiguration {
     /// Nombre de la entidad externa
-    name: String,
+    pub(crate) name: String,
     /// Dirección IP
-    ip: String,
+    pub(crate) ip: String,
     /// Puerto
-    port: String,
+    pub(crate) port: String,
 }
 
 /// Configuración del Procesador de Pagos
 #[derive(Deserialize, Debug)]
-struct Configuration {
+pub(crate) struct Configuration {
     /// Configuración de las Entidades Externas a
     /// las cuales se conecta el Procesador de pagos
-    external_entities: Vec<ExternalEntityConfiguration>,
+    pub(crate) external_entities: Vec<ExternalEntityConfiguration>,
     /// Ruta del archivo de *logs*
-    log_file: String,
+    pub(crate) log_file: String,
     /// Ruta del archivo de entrada de los pagos a procesar
-    payment_transactions: String,
+    pub(crate) payment_transactions: String,
     /// Ruta del archivo de salida de los pagos fallidos
-    failed_transactions: String,
+    pub(crate) failed_transactions: String,
 }
 
 impl Configuration {
@@ -48,7 +48,7 @@ impl Configuration {
     ///   "failed_transactions": "string"
     /// }
     /// ```
-    fn new(path: &str) -> Result<Configuration, Box<dyn Error>> {
+    pub(crate) fn new(path: &str) -> Result<Configuration, Box<dyn Error>> {
         let f = File::open(path)?;
         let config = serde_json::from_reader(f)?;
 
