@@ -31,7 +31,7 @@ impl Reader {
                     .create(true)
                     .truncate(true)
                     .open(path)
-                    .expect("Error creando archivo de log");
+                    .expect("Error Leyendo archivo");
 
                 let reader = BufReader::new(file);
                 Reader {
@@ -52,7 +52,7 @@ pub fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Er
 }
 
 impl Actor for Reader {
-    type Context = SyncContext<Self>;
+    type Context = Context<Self>;
 }
 
 /// Mensaje para solicitar al parser un nuevo paquete turístico
@@ -70,23 +70,24 @@ impl Handler<ParseTouristPackage> for Reader {
     ) -> Self::Result {
         let mut buffer = String::from("");
 
-        if let Ok(_line) = self.buffer.read_line(&mut buffer) {
-            let splitted_package_line: Vec<&str> = buffer.split(',').collect();
+        if let Ok(line) = self.buffer.read_line(&mut buffer) {
+            if line > 0 {
+                let splitted_package_line: Vec<&str> = buffer.split(',').collect();
 
-            let transaction = Transaction {
-                id: splitted_package_line[0].to_string(),
-                precio: splitted_package_line[1].to_string(),
-            };
-            self.logger_address.do_send(Log(format!(
-                "Se leyó paquete con id {} - y precio: {}",
-                splitted_package_line[0], splitted_package_line[1]
-            )));
+                let transaction = Transaction {
+                    id: splitted_package_line[0].to_string(),
+                    precio: splitted_package_line[1].to_string(),
+                };
+                self.logger_address.do_send(Log(format!(
+                    "Se leyó paquete con id {} - y precio: {}",
+                    splitted_package_line[0], splitted_package_line[1]
+                )));
 
-            self.pp_address
-                .do_send(SendTransactionToEntities(transaction));
+                self.pp_address
+                    .do_send(SendTransactionToEntities(transaction));
 
-            ctx.address().do_send(ParseTouristPackage());
-
+                ctx.address().do_send(ParseTouristPackage());
+            }
             // thread::sleep(Duration::from_secs(1));
         }
     }

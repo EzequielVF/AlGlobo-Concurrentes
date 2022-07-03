@@ -1,11 +1,14 @@
-use crate::communication::{connect_to_server, read_answer, send_transaction_result};
+use std::io::Error;
+use std::net::TcpStream;
+
+use actix::{Actor, Addr, Context, Handler, Message, SyncContext};
+use actix::prelude::*;
+
+use crate::{Logger, TransactionManager};
+use crate::communication::{read_answer, send_transaction_result};
 use crate::logger::Log;
 use crate::transaction_manager::ProcessEntityAnswer;
 use crate::types::{Answer, EntityAnswer, ServerResponse};
-use crate::{Logger, TransactionManager};
-use actix::prelude::*;
-use actix::{Actor, Addr, Context, Handler, Message, SyncContext};
-use std::net::TcpStream;
 
 pub struct ExternalEntityReceiver {
     name: String,
@@ -14,15 +17,13 @@ pub struct ExternalEntityReceiver {
 }
 
 impl Actor for ExternalEntityReceiver {
-    type Context = SyncContext<Self>;
+    type Context = Context<Self>;
 }
 
 impl ExternalEntityReceiver {
-    pub fn new(
-        name: &str,
-        stream: Result<TcpStream, std::io::Error>,
-        logger_addr: Addr<Logger>,
-    ) -> Self {
+    pub fn new(name: &str,
+               stream: Result<TcpStream, Error>,
+               logger_addr: Addr<Logger>) -> Self {
         ExternalEntityReceiver {
             name: name.to_string(),
             stream,
@@ -39,7 +40,7 @@ pub struct ReceiveServerAnswer(pub Addr<TransactionManager>);
 impl Handler<ReceiveServerAnswer> for ExternalEntityReceiver {
     type Result = ();
 
-    fn handle(&mut self, msg: ReceiveServerAnswer, _ctx: &mut SyncContext<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ReceiveServerAnswer, _ctx: &mut Context<Self>) -> Self::Result {
         let transaction_manager_addr = msg.0;
 
         match &self.stream {

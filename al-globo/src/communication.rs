@@ -50,7 +50,7 @@ impl From<Type> for u8 {
 /// Realiza la conexión al servidor indicado en ip y puerto (`port`).
 /// Si fue exitosa, devuelve el socket creado,
 /// si no, retorna el `Err`
-pub fn connect_to_server(ip: &str, port: &str) -> Result<TcpStream, &'static str> {
+pub fn connect_to_server(ip: &str, port: &str) -> Result<TcpStream, & 'static str> {
     let address = format!("{}:{}", ip, port);
     println!("[CLIENTE] Intentando establecer conexión con: {}", address);
 

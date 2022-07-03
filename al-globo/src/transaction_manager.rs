@@ -48,7 +48,7 @@ impl TransactionManager {
 }
 
 impl Actor for TransactionManager {
-    type Context = SyncContext<Self>;
+    type Context = Context<Self>;
 }
 
 /// Mensaje para enviar transacción a servicios externos
@@ -62,7 +62,7 @@ impl Handler<SendTransactionToEntities> for TransactionManager {
     fn handle(
         &mut self,
         msg: SendTransactionToEntities,
-        ctx: &mut SyncContext<Self>,
+        ctx: &mut Context<Self>,
     ) -> Self::Result {
         let transaction = msg.0;
         self.transactions
@@ -104,7 +104,7 @@ pub struct ProcessEntityAnswer(pub EntityAnswer);
 impl Handler<ProcessEntityAnswer> for TransactionManager {
     type Result = ();
 
-    fn handle(&mut self, msg: ProcessEntityAnswer, _ctx: &mut SyncContext<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ProcessEntityAnswer, _ctx: &mut Context<Self>) -> Self::Result {
         let entity_answer = msg.0;
 
         if let Some(transaction_answers) =

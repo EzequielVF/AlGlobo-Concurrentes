@@ -97,19 +97,20 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
 }
 
 fn random_duration_processing() {
-    const FACTOR_TEMPORAL: u64 = 1;
+    const FACTOR_TEMPORAL: u64 = 0;
     let ms = thread_rng().gen_range(2000, 5000);
     thread::sleep(Duration::from_millis(ms * FACTOR_TEMPORAL));
 }
 
 fn successful_payment() -> bool {
-    const ERROR_THRESHOLD: i32 = 500;
+    const ERROR_THRESHOLD: i32 = 1001;
 
     random_duration_processing();
 
     let random_value = thread_rng().gen_range(0, 1000);
 
-    random_value > ERROR_THRESHOLD
+    //random_value > ERROR_THRESHOLD
+    true
 }
 
 #[doc(hidden)]

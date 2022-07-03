@@ -1,14 +1,15 @@
-use actix::prelude::*;
+use std::io::Error;
 use std::net::TcpStream;
 
 use actix::{Actor, Addr, Context, Handler, Message, SyncContext};
+use actix::prelude::*;
 
-use crate::communication::{connect_to_server, read_answer, send_package, send_transaction_result};
+use crate::communication::{read_answer, send_package, send_transaction_result};
 use crate::external_entity_receiver::{ExternalEntityReceiver, ReceiveServerAnswer};
+use crate::Logger;
 use crate::logger::Log;
 use crate::transaction_manager::TransactionManager;
 use crate::types::{EntityAnswer, Transaction, TransactionResult};
-use crate::Logger;
 
 /// Representación de la Entidad Externa (*Aerolínea*, *Banco* u *Hotel*)
 /// a la cual el *Procesador de Pagos* se conecta para enviar las transacciones
@@ -20,13 +21,13 @@ pub struct ExternalEntitySender {
 }
 
 impl Actor for ExternalEntitySender {
-    type Context = SyncContext<Self>;
+    type Context = Context<Self>;
 }
 
 impl ExternalEntitySender {
     pub fn new(
         name: &str,
-        stream: Result<TcpStream, std::io::Error>,
+        stream: Result<TcpStream, Error>,
         logger_addr: Addr<Logger>,
         external_entity_receiver_addr: Addr<ExternalEntityReceiver>,
     ) -> Self {
@@ -50,7 +51,7 @@ impl Handler<SendTransactionToServer> for ExternalEntitySender {
     fn handle(
         &mut self,
         msg: SendTransactionToServer,
-        _ctx: &mut SyncContext<Self>,
+        _ctx: &mut Context<Self>,
     ) -> Self::Result {
         let sender = msg.1;
         let transaction = msg.0;
@@ -87,7 +88,7 @@ impl Handler<SendConfirmationOrRollbackToServer> for ExternalEntitySender {
     fn handle(
         &mut self,
         msg: SendConfirmationOrRollbackToServer,
-        _ctx: &mut SyncContext<Self>,
+        _ctx: &mut Context<Self>,
     ) -> Self::Result {
         let transaction_result = msg.0;
 

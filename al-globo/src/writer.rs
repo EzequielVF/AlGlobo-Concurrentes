@@ -14,7 +14,7 @@ pub struct Writer {
 }
 
 impl Actor for Writer {
-    type Context = SyncContext<Self>;
+    type Context = Context<Self>;
 }
 
 impl Writer {
@@ -25,8 +25,9 @@ impl Writer {
             .truncate(true)
             .open(path)
             .expect("Error creando archivo de fallas");
+
         Writer {
-            file: file,
+            file,
             logger_address: addr,
         }
     }
@@ -39,7 +40,7 @@ pub struct WriteTransaction(pub Transaction);
 impl Handler<WriteTransaction> for Writer {
     type Result = ();
 
-    fn handle(&mut self, msg: WriteTransaction, _ctx: &mut SyncContext<Self>) -> Self::Result {
+    fn handle(&mut self, msg: WriteTransaction, _ctx: &mut Context<Self>) -> Self::Result {
         let transaction = msg.0;
         let message = format!("{},{}\n", transaction.id, transaction.precio);
         self.file

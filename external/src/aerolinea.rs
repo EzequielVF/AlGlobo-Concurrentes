@@ -4,7 +4,7 @@ mod logger;
 mod server;
 
 const IP: &str = "127.0.0.1";
-const PORT: &str = "3000";
+const PORT: &str = "4000";
 const SERVICE_NAME: &str = "aerolinea";
 
 fn main() {

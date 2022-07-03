@@ -3,12 +3,13 @@ use chrono::Local;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
+#[derive()]
 pub struct Logger {
-    file: File,
+    pub file: File,
 }
 
 impl Actor for Logger {
-    type Context = SyncContext<Self>;
+    type Context = Context<Self>;
 }
 
 // Log para la escritura de mensajes informativos y de error
@@ -35,7 +36,7 @@ pub struct Log(pub String);
 impl Handler<Log> for Logger {
     type Result = ();
 
-    fn handle(&mut self, msg: Log, _ctx: &mut SyncContext<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Log, _ctx: &mut Context<Self>) -> Self::Result {
         let message = msg.0;
         let time = Local::now().to_string();
         let message = format!("[{}] - {}\n", time, message);
