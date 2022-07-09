@@ -6,7 +6,7 @@ use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
 use crate::logger::Log;
 use crate::transaction_manager::SendTransactionToEntities;
 use crate::types::Transaction;
-use crate::{Logger, TransactionManager};
+use crate::{Logger};
 
 /// Parser para archivo de paquetes turísticos
 pub struct Reader {

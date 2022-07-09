@@ -3,5 +3,6 @@
 [workspace]
 members = [
     "external",
-    "al-globo"
+    "al-globo",
+    "refactor",
 ]

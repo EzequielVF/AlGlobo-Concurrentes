@@ -4,38 +4,32 @@ use std::net::TcpStream;
 use actix::{Actor, Addr, Context, Handler, Message, SyncContext};
 use actix::prelude::*;
 
-use crate::communication::{read_answer, send_package, send_transaction_result};
-use crate::external_entity_receiver::{ExternalEntityReceiver, ReceiveServerAnswer};
 use crate::Logger;
 use crate::logger::Log;
-use crate::transaction_manager::TransactionManager;
-use crate::types::{EntityAnswer, Transaction, TransactionResult};
+
 
 /// Representación de la Entidad Externa (*Aerolínea*, *Banco* u *Hotel*)
 /// a la cual el *Procesador de Pagos* se conecta para enviar las transacciones
 pub struct ExternalEntitySender {
     name: String,
     stream: Result<TcpStream, std::io::Error>,
-    logger_addr: Addr<Logger>,
-    external_entity_receiver_addr: Addr<ExternalEntityReceiver>,
+    logger: Addr<Logger>,
 }
 
 impl Actor for ExternalEntitySender {
-    type Context = Context<Self>;
+    // type Context = SyncContext<Self>;
 }
 
 impl ExternalEntitySender {
     pub fn new(
         name: &str,
         stream: Result<TcpStream, Error>,
-        logger_addr: Addr<Logger>,
-        external_entity_receiver_addr: Addr<ExternalEntityReceiver>,
+        logger: Addr<Logger>,
     ) -> Self {
         ExternalEntitySender {
             name: name.to_string(),
             stream,
-            logger_addr,
-            external_entity_receiver_addr,
+            logger,
         }
     }
 }
@@ -59,16 +53,14 @@ impl Handler<SendTransactionToServer> for ExternalEntitySender {
         match &self.stream {
             Ok(tcpStream) => {
                 let mut channel = tcpStream.try_clone().unwrap();
-                self.logger_addr.do_send(Log(format!(
-                    "Se envía transacción de id {} al servidor [{}]",
-                    transaction.id, self.name
-                )));
+                self.logger.do_send(
+                    Log(format!("Se envía transacción de id {} al servidor  [{}]",
+                                transaction.id, self.name))
+                );
                 send_package(&mut channel, transaction.clone(), &self.name);
-                self.external_entity_receiver_addr
-                    .do_send(ReceiveServerAnswer(sender));
             }
             Err(_) => {
-                self.logger_addr.do_send(Log(format!(
+                self.logger.do_send(Log(format!(
                     "Ocurrió un error al intentar enviar transacción de id {} al servidor [{}]",
                     transaction.id, self.name
                 )));
@@ -102,13 +94,13 @@ impl Handler<SendConfirmationOrRollbackToServer> for ExternalEntitySender {
             Ok(t) => {
                 let mut channel = t.try_clone().unwrap();
                 send_transaction_result(&mut channel, transaction_result.clone());
-                self.logger_addr.do_send(Log(format!(
+                self.logger.do_send(Log(format!(
                     "Se envía mensage {} para transacción {} al servidor [{}]",
                     message, transaction_result.transaction_id, self.name
                 )));
             }
             Err(_) => {
-                self.logger_addr.do_send(Log(format!("Ocurrió un error al intentar enviar mensaje  {} para transacción {} al servidor [{}]", message, transaction_result.transaction_id, self.name)));
+                self.logger.do_send(Log(format!("Ocurrió un error al intentar enviar mensaje  {} para transacción {} al servidor [{}]", message, transaction_result.transaction_id, self.name)));
             }
         }
     }
