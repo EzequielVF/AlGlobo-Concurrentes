@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 
 use crate::logger::Logger;
 use crate::server::Type::{Commit, Rollback};
@@ -56,7 +56,7 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                                 "<SERVER> Recibí una transacción de código {}, voy a procesarlo!",
                                 aux
                             )
-                            .as_str(),
+                                .as_str(),
                         );
                         if successful_payment() {
                             logger.lock().unwrap().log(format!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux).as_str());
