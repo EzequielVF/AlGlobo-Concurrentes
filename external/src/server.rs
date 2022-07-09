@@ -48,7 +48,7 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
 
                 let mut buffer_packet: Vec<u8> = vec![0; size as usize]; // Me creo un contenedor del tamaño q me dijeron
                 let _bytes_read = stream.read_exact(&mut buffer_packet); // Leo lo que me dijeron que lea
-                let mut aux = String::new();
+
                 match message_type {
                     Pay => {
                         aux = read(buffer_packet);
