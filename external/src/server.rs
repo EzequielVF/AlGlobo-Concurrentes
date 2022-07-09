@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
 
@@ -80,7 +81,7 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                         );
                     }
                     _ => {
-                        println!("<SERVER> Mensaje desconocido");
+                        println!("Mensaje desconocido");
                     }
                 }
             }

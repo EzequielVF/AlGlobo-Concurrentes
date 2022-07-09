@@ -139,7 +139,6 @@ impl Handler<ProcessEntityAnswer> for TransactionManager {
             let completed: bool = transaction_answers
                 .iter()
                 .all(|(_n, state)| *state != Answer::Pending);
-            println!("Respuestas: {:?} - ¿Completo? {}", transaction_answers, completed);
 
             if completed {
                 let ok_entities = transaction_answers
