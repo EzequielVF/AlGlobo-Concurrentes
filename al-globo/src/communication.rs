@@ -17,8 +17,9 @@ pub fn connect_to_server(config: &Value, entity_name: &str) -> Result<TcpStream,
 }
 
 pub fn send_package(stream: &mut TcpStream, transaction: Transaction, name: &str) {
-    let package_price = transaction.id.to_string();
-    let size = (package_price.len() + 1) as u8;
+    let package_id = transaction.id.to_string();
+    let package_price = transaction.precio.to_string();
+    let size = (package_price.len() + package_id.len() + 2) as u8;
     let buffer = [Pay.into(), size];
 
     match stream.write_all(&buffer) {
@@ -35,6 +36,7 @@ pub fn send_package(stream: &mut TcpStream, transaction: Transaction, name: &str
     }
 
     let mut send_buffer: Vec<u8> = Vec::with_capacity(size.into()); // Aca me armo el buffer con el contenido del mensaje, en este caso solo me meto los "500" que quiero pagar
+    push_to_buffer(&mut send_buffer, package_id);
     push_to_buffer(&mut send_buffer, package_price);
 
     match stream.write(&send_buffer) {

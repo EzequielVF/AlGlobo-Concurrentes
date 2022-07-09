@@ -57,8 +57,6 @@ fn receiver(stream: &mut TcpStream, rec: Receiver<Addr<TransactionManager>>, nam
 // subir los thread arriba y correr lo que ahora esta en el main en un system block
 #[actix_rt::main]
 async fn main() {
-//fn main() {
-
     // Get configuration
     let config = Box::leak(Box::new(read_config("al-globo/src/config.json")));
 

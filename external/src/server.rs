@@ -14,6 +14,13 @@ pub use self::Type::{Error, Pay, Successful, Unknown};
 
 const ERROR: u8 = 1;
 
+pub enum TransactionStatus {
+    Prepare,
+    Commit,
+    Abort,
+    Failed
+}
+
 pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
     let address = format!("{}:{}", ip, port);
     let logger = Arc::new(Mutex::new(Logger::new(nombre)));
@@ -23,22 +30,24 @@ pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
             .unwrap()
             .log(format!("Esperando clientes en: {}", address).as_str());
     }
+    let transactions = Arc::new(RwLock::new(HashMap::<String, TransactionStatus>::new()));
     loop {
         let listener = TcpListener::bind(&address)?;
         let connection: (TcpStream, SocketAddr) = listener.accept()?;
         let mut client_stream = connection.0;
+        let transactions_aux = transactions.clone();
         let logger_clone = logger.clone();
         thread::Builder::new()
             .name("<<Cliente>>".into())
             .spawn(move || {
                 logger_clone.lock().unwrap().log("Se lanzó un cliente!");
-                read_packet_from_client(&mut client_stream, logger_clone);
+                read_packet_from_client(&mut client_stream, logger_clone, transactions_aux.clone());
             })
             .unwrap();
     }
 }
 
-fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
+fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>, transactions: Arc<RwLock<HashMap<String, TransactionStatus>>>) {
     loop {
         let mut num_buffer = [0u8; 2];
         match stream.read_exact(&mut num_buffer) {
@@ -51,34 +60,42 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
 
                 match message_type {
                     Pay => {
-                        aux = read(buffer_packet);
-                        logger.lock().unwrap().log(
-                            format!(
-                                "<SERVER> Recibí una transacción de código {}, voy a procesarlo!",
-                                aux
-                            )
-                                .as_str(),
-                        );
+                        let (id, precio) = read_pay(buffer_packet);
+                        logger.lock().unwrap().log(format!("Recibí una transacción de código {} y precio:{}, voy a procesarlo!", id, precio).as_str());
                         if successful_payment() {
-                            logger.lock().unwrap().log(format!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux).as_str());
-                            send_message(stream, aux, true, logger.clone());
+                            logger.lock().unwrap().log(format!("La transacción id {} fue procesada exitosamente", id).as_str());
+                            send_message(stream, id.clone(), true, logger.clone());
+                            if let Ok(mut transactions) = transactions.write() {
+                                transactions.insert(id, TransactionStatus::Prepare);
+                            }
                         } else {
-                            logger.lock().unwrap().log(format!("<SERVER> Tuvimos un problema al validar el pago de {}$.", aux).as_str());
-                            send_message(stream, aux, false, logger.clone());
+                            logger.lock().unwrap().log(format!("Tuvimos un problema validando la transacción id: {}", id).as_str());
+                            send_message(stream, id.clone(), false, logger.clone());
+
+                            if let Ok(mut transactions) = transactions.write() {
+                                transactions.insert(id, TransactionStatus::Failed);
+                            }
+
                         }
                     }
                     Commit => {
-                        let aux = read(buffer_packet);
+                        let id = read(buffer_packet);
                         logger.lock().unwrap().log(
-                            format!("<SERVER> La operación con ID:{} fue commiteada", aux).as_str(),
+                            format!("La operación con ID: {} fue commiteada", id).as_str(),
                         );
+                        if let Ok(mut transactions) = transactions.write() {
+                            transactions.insert(id.clone(), TransactionStatus::Commit);
+                        }
                     }
                     Rollback => {
-                        let aux = read(buffer_packet);
+                        let id = read(buffer_packet);
                         logger.lock().unwrap().log(
-                            format!("<SERVER> La operación con ID:{} fue rollbackeada!", aux)
+                            format!("La operación con ID:{} fue rollbackeada!", id)
                                 .as_str(),
                         );
+                        if let Ok(mut transactions) = transactions.write() {
+                            transactions.insert(id.clone(), TransactionStatus::Abort);
+                        }
                     }
                     _ => {
                         println!("Mensaje desconocido");
@@ -100,14 +117,13 @@ fn random_duration_processing() {
 }
 
 fn successful_payment() -> bool {
-    const ERROR_THRESHOLD: i32 = 1001;
+    const ERROR_THRESHOLD: i32 = 500;
 
     random_duration_processing();
 
     let random_value = thread_rng().gen_range(0, 1000);
 
-    //random_value > ERROR_THRESHOLD
-    true
+    random_value > ERROR_THRESHOLD
 }
 
 #[doc(hidden)]
@@ -149,6 +165,20 @@ fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
         Ok(str) => Ok(str.to_owned()),
         Err(_) => Err(ERROR),
     }
+}
+
+fn read_pay(buffer_packet: Vec<u8>) -> (String, String) {
+    let mut _index = 0 as usize;
+
+    let id_size: usize = buffer_packet[(_index) as usize] as usize;
+    _index += 1 as usize;
+    let aux_1 = bytes2string(&buffer_packet[_index..(_index + id_size)]).unwrap();
+    _index += id_size;
+
+    let pago_size: usize = buffer_packet[(_index) as usize] as usize;
+    _index += 1 as usize;
+    let aux_2 = bytes2string(&buffer_packet[_index..(_index + pago_size)]).unwrap();
+    (aux_1, aux_2)
 }
 
 fn read(buffer_packet: Vec<u8>) -> String {
