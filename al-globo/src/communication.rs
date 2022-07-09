@@ -58,7 +58,7 @@ pub fn connect_to_server(ip: &str, port: &str) -> io::Result<TcpStream>{
 
 /// Envía el paquete turístico (`package`) por el socket (`stream`)
 pub fn send_package(stream: &mut TcpStream, transaction: Transaction, name: &str) {
-    let package_price = transaction.precio.to_string();
+    let package_price = transaction.id.to_string();
     let size = (package_price.len() + 1) as u8;
     let buffer = [Pay.into(), size];
 

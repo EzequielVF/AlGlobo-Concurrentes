@@ -127,7 +127,6 @@ impl Handler<ProcessEntityAnswer> for TransactionManager {
 
         if let Some(transaction_answers) =
         self.answers.get_mut(&entity_answer.transaction_id)
-
         {
             transaction_answers.insert(entity_answer.entity_name.clone(),
                                        entity_answer.answer.clone());

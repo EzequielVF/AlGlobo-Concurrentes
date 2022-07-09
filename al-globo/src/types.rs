@@ -24,6 +24,7 @@ pub struct Transaction {
     pub precio: String,
 }
 
+#[derive(Debug)]
 pub struct EntityAnswer {
     pub entity_name: String,
     pub transaction_id: String,
@@ -38,6 +39,7 @@ pub struct TransactionResult {
     pub success: bool,
 }
 
+#[derive(Debug)]
 pub struct ServerResponse {
     pub transaction_id: String,
     pub response: bool,
