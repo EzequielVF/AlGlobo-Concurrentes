@@ -1,62 +1,21 @@
-use std::io;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
 
-use crate::types::{ServerResponse, Transaction, TransactionResult, ERROR};
+use serde_json::Value;
 
-pub use self::Type::{Commit, Error, Pay, Rollback, Successful, Unknown};
+use crate::types::{ERROR, ServerResponse, Transaction, TransactionResult, Type};
+pub use crate::types::Type::{Commit, Error, Pay, Rollback, Successful, Unknown};
 
-/// Respuesta recibidas por parte del servidor
-pub enum Type {
-    /// Ocurrió un error en el servidor
-    Error,
-    /// Mensaje de Pago
-    Pay,
-    /// Respuesta de procesamiento exitoso
-    Successful,
-    /// Commit de transacción
-    Commit,
-    /// Rollback de transacción
-    Rollback,
-    /// Mensaje desconocido
-    Unknown,
-}
-
-impl From<u8> for Type {
-    fn from(code: u8) -> Type {
-        match code & 0xF0 {
-            0x00 => Pay,
-            0x10 => Successful,
-            0x20 => Error,
-            0x30 => Commit,
-            0x40 => Rollback,
-            _ => Unknown,
-        }
-    }
-}
-
-impl From<Type> for u8 {
-    fn from(code: Type) -> u8 {
-        match code {
-            Pay => 0x00,
-            Successful => 0x10,
-            Error => 0x20,
-            Commit => 0x30,
-            Rollback => 0x40,
-            _ => 0x99,
-        }
-    }
-}
-
-/// Realiza la conexión al servidor indicado en ip y puerto (`port`).
-/// Si fue exitosa, devuelve el socket creado,
-/// si no, retorna el `Err`
-pub fn connect_to_server(ip: &str, port: &str) -> io::Result<TcpStream>{
+pub fn connect_to_server(config: &Value, entity_name: &str) -> Result<TcpStream, std::io::Error> {
+    let ip = config[entity_name]["ip"].to_string();
+    let ip = &ip[1..ip.len()-1];
+    let port = config[entity_name]["port"].to_string();
     let address = format!("{}:{}", ip, port);
+    println!("La address es:{}", address);
     TcpStream::connect(address)
 }
 
-/// Envía el paquete turístico (`package`) por el socket (`stream`)
 pub fn send_package(stream: &mut TcpStream, transaction: Transaction, name: &str) {
     let package_price = transaction.id.to_string();
     let size = (package_price.len() + 1) as u8;
@@ -69,8 +28,8 @@ pub fn send_package(stream: &mut TcpStream, transaction: Transaction, name: &str
                 name, transaction.id
             );
         }
-        Err(_) => {
-            println!("<{}> No me pude contactar con el banco!", name);
+        Err(e) => {
+            println!("<{}> No me pude contactar con el banco! {}", name, e.to_string());
             // exit(0);
         }
     }
@@ -138,7 +97,7 @@ fn push_to_buffer(buffer: &mut Vec<u8>, data: String) {
 
 /// Recibe el resultado de la operación por parte del servicio solicitado
 /// y mapea el resultado a `RequestState`
-pub fn read_answer(stream: &mut TcpStream) -> ServerResponse {
+pub fn read_answer(mut stream: TcpStream) -> ServerResponse {
     let mut num_buffer = [0u8; 2];
     let _aux = stream.read_exact(&mut num_buffer);
     let size = num_buffer[1];

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::communication::{Commit, Error, Pay, Rollback, Successful, Unknown};
 
 pub const ERROR: u8 = 1;
 
@@ -43,4 +43,40 @@ pub struct TransactionResult {
 pub struct ServerResponse {
     pub transaction_id: String,
     pub response: bool,
+}
+
+pub enum Type {
+    Error,
+    Pay,
+    Successful,
+    Commit,
+    Rollback,
+    Unknown,
+}
+
+impl From<u8> for Type {
+    fn from(code: u8) -> Type {
+        match code & 0xF0 {
+            0x00 => Pay,
+            0x10 => Successful,
+            0x20 => Error,
+            0x30 => Commit,
+            0x40 => Rollback,
+            _ => Unknown,
+        }
+    }
+}
+
+
+impl From<Type> for u8 {
+    fn from(code: Type) -> u8 {
+        match code {
+            Pay => 0x00,
+            Successful => 0x10,
+            Error => 0x20,
+            Commit => 0x30,
+            Rollback => 0x40,
+            _ => 0x99,
+        }
+    }
 }
