@@ -9,4 +9,3 @@ target/
 # Generados
 logs/
 *.log
-*.json

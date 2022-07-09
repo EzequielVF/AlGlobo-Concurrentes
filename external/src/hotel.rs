@@ -4,7 +4,7 @@ mod logger;
 mod server;
 
 const IP: &str = "127.0.0.1";
-const PORT: &str = "4002";
+const PORT: &str = "4007";
 const SERVICE_NAME: &str = "hotel";
 
 fn main() {
