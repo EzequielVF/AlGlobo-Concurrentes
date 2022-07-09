@@ -1,94 +1,80 @@
+use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader};
 
-use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
-
 use crate::logger::Log;
-use crate::transaction_manager::SendTransactionToEntities;
 use crate::types::Transaction;
-use crate::{Logger};
+use crate::{Logger, TransactionManager};
+use crate::transaction_manager::SendTransactionToEntities;
 
-/// Parser para archivo de paquetes turísticos
 pub struct Reader {
-    buffer: BufReader<File>,
-    pp_address: Addr<TransactionManager>,
-    logger_address: Addr<Logger>,
+    file: BufReader<File>,
+    transaction_manager: Addr<TransactionManager>,
+    logger: Addr<Logger>,
 }
 
 impl Reader {
-    pub fn new(path: &str, addr: Addr<TransactionManager>, addr_log: Addr<Logger>) -> Self {
-        let t = abrir_archivo_paquetes(path);
-        match t {
-            Ok(b) => Reader {
-                buffer: b,
-                pp_address: addr,
-                logger_address: addr_log,
+    pub fn new(path: &str, transaction_manager: Addr<TransactionManager>, logger: Addr<Logger>) -> Self {
+        let file = open_file(path);
+        match file {
+            Ok(f) => Reader {
+                file: f,
+                transaction_manager,
+                logger,
             },
             Err(_) => {
-                println!("<MAIN> No pude abrir el archivo!");
                 let file = OpenOptions::new()
                     .write(false)
                     .create(true)
                     .truncate(true)
                     .open(path)
                     .expect("Error Leyendo archivo");
-
                 let reader = BufReader::new(file);
                 Reader {
-                    buffer: reader,
-                    pp_address: addr,
-                    logger_address: addr_log,
+                    file: reader,
+                    transaction_manager,
+                    logger,
                 }
             }
         }
     }
 }
 
-pub fn abrir_archivo_paquetes(ruta: &str) -> Result<BufReader<File>, std::io::Error> {
-    match File::open(ruta) {
-        Ok(archivo_pagos) => Ok(BufReader::new(archivo_pagos)),
-        Err(err) => Err(err),
+
+impl Actor for Reader {
+    type Context = SyncContext<Self>;
+}
+
+#[derive(Message, Clone)]
+#[rtype(result = "()")]
+pub struct ReadTransaction();
+
+impl Handler<ReadTransaction> for Reader {
+    type Result = ();
+
+    fn handle(&mut self,_msg: ReadTransaction,ctx: &mut <Reader as Actor>::Context) -> Self::Result {
+        
+        let mut buffer = String::from("");
+
+        if let Ok(line) = self.file.read_line(&mut buffer) {
+            if line > 0 {
+                let splitted_line: Vec<&str> = buffer.split(',').collect();
+                let transaction = Transaction {
+                    id: splitted_line[0].to_string(),
+                    precio: splitted_line[1].to_string(),
+                };
+                self.logger.do_send(Log(format!("Se leyó paquete con id {} - y precio: {}",
+                    splitted_line[0], splitted_line[1])));
+                self.transaction_manager.do_send(SendTransactionToEntities(transaction));
+                ctx.address().do_send(ReadTransaction());
+            }
+        }
     }
 }
 
-impl Actor for Reader {
-    type Context = Context<Self>;
-}
-
-/// Mensaje para solicitar al parser un nuevo paquete turístico
-#[derive(Message, Clone)]
-#[rtype(result = "()")]
-pub struct ParseTouristPackage();
-
-impl Handler<ParseTouristPackage> for Reader {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        _msg: ParseTouristPackage,
-        ctx: &mut <Reader as Actor>::Context,
-    ) -> Self::Result {
-        let mut buffer = String::from("");
-
-        if let Ok(line) = self.buffer.read_line(&mut buffer) {
-            if line > 0 {
-                let splitted_package_line: Vec<&str> = buffer.split(',').collect();
-
-                let transaction = Transaction {
-                    id: splitted_package_line[0].to_string(),
-                    precio: splitted_package_line[1].to_string(),
-                };
-                self.logger_address.do_send(Log(format!(
-                    "Se leyó paquete con id {} - y precio: {}",
-                    splitted_package_line[0], splitted_package_line[1]
-                )));
-
-                self.pp_address
-                    .do_send(SendTransactionToEntities(transaction));
-
-                ctx.address().do_send(ParseTouristPackage());
-            }
-            // thread::sleep(Duration::from_secs(1));
-        }
+pub fn open_file(ruta: &str) -> Result<BufReader<File>, std::io::Error> {
+    match File::open(ruta) {
+        Ok(file) => Ok(BufReader::new(file)),
+        Err(err) => Err(err),
     }
 }

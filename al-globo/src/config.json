@@ -1,0 +1,31 @@
+{
+  "airline": {
+    "ip": "127.0.0.1",
+    "port": 4005,
+    "log_file": "",
+    "operations_file": ""
+  },
+
+  "bank": {
+    "ip" : "127.0.0.1",
+    "port": 4006,
+    "log_file": "",
+    "operations_file": ""
+  },
+
+  "hotel": {
+    "ip" : "127.0.0.1",
+    "port": 4007,
+    "log_file": "",
+    "operations_file": ""
+  },
+
+  "alglobo": {
+    "ip" : "127.0.0.1",
+    "port": 3003,
+    "log_file": "logs/alglobo.log",
+    "transactions_file": "transactions/transactions.csv",
+    "operations_file":"" ,
+    "writer_file": "fails/fails.log"
+  }
+}

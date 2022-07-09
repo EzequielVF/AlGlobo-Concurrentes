@@ -26,12 +26,12 @@ pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
         let listener = TcpListener::bind(&address)?;
         let connection: (TcpStream, SocketAddr) = listener.accept()?;
         let mut client_stream = connection.0;
-        let logger_clon = logger.clone();
+        let logger_clone = logger.clone();
         thread::Builder::new()
             .name("<<Cliente>>".into())
             .spawn(move || {
-                println!("Se lanzó un cliente!");
-                read_packet_from_client(&mut client_stream, logger_clon);
+                logger_clone.lock().unwrap().log("Se lanzó un cliente!");
+                read_packet_from_client(&mut client_stream, logger_clone);
             })
             .unwrap();
     }
@@ -58,16 +58,12 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>) {
                             )
                             .as_str(),
                         );
-
                         if successful_payment() {
-                            println!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux);
-                            send_message(stream, aux, true);
+                            logger.lock().unwrap().log(format!("<SERVER> El Pago de {}$ fue recibido adecuadamente.", aux).as_str());
+                            send_message(stream, aux, true, logger.clone());
                         } else {
-                            println!(
-                                "<SERVER> Tuvimos un problema al validar el pago de {}$.",
-                                aux
-                            );
-                            send_message(stream, aux, false);
+                            logger.lock().unwrap().log(format!("<SERVER> Tuvimos un problema al validar el pago de {}$.", aux).as_str());
+                            send_message(stream, aux, false, logger.clone());
                         }
                     }
                     Commit => {
@@ -119,7 +115,7 @@ fn push_to_buffer(buffer: &mut Vec<u8>, data: String) {
     buffer.extend_from_slice(data.as_bytes());
 }
 
-fn send_message(stream: &mut TcpStream, id: String, estado: bool) {
+fn send_message(stream: &mut TcpStream, id: String, estado: bool, logger: Arc<Mutex<Logger>>) {
     let size = (id.len() + 1) as u8;
     let mut buffer = [Error.into(), size];
     if estado {
@@ -127,10 +123,11 @@ fn send_message(stream: &mut TcpStream, id: String, estado: bool) {
     }
     match stream.write_all(&buffer) {
         Ok(_) => {
-            println!("<SERVER> Cabecera enviada correctamente!");
+            logger.lock().unwrap().log(format!("Se envió cabecera para id {} al cliente!", id).as_str());
         }
         Err(_) => {
-            println!("<SERVER> Hubo un problema al intentar mandar a cabecera al cliente!")
+            logger.lock().unwrap().log((format!(
+                "Hubo un problema al intentar enviar cabecera para transacción de id {} al cliente!", id).as_str()));
         }
     }
 
@@ -138,10 +135,10 @@ fn send_message(stream: &mut TcpStream, id: String, estado: bool) {
     push_to_buffer(&mut send_buffer, id.clone());
     match stream.write(&send_buffer) {
         Ok(_) => {
-            println!("Mensaje (id: {}) enviado correctamente!", id);
+            logger.lock().unwrap().log(format!("Mensaje (id: {}) enviado correctamente!", id).as_str());
         }
         Err(_) => {
-            println!("No me pude contactar con el cliente!");
+            logger.lock().unwrap().log(format!("No pude enviar respuesta para transacción de id {}", id).as_str());
         }
     }
 }

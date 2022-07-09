@@ -1,20 +1,19 @@
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Write};
+use std::io::{Write};
 
-use actix::prelude::*;
-use actix::{Actor, Addr, Context, Handler, Message, SyncContext};
+use actix::{Actor, Addr, Handler, Message, SyncContext};
 
-use crate::reader::abrir_archivo_paquetes;
 use crate::types::Transaction;
 use crate::Logger;
+use crate::logger::Log;
 
 pub struct Writer {
     file: File,
-    logger_address: Addr<Logger>,
+    logger: Addr<Logger>,
 }
 
 impl Actor for Writer {
-    type Context = Context<Self>;
+    type Context = SyncContext<Self>;
 }
 
 impl Writer {
@@ -28,7 +27,7 @@ impl Writer {
 
         Writer {
             file,
-            logger_address: addr,
+            logger: addr,
         }
     }
 }
@@ -40,11 +39,9 @@ pub struct WriteTransaction(pub Transaction);
 impl Handler<WriteTransaction> for Writer {
     type Result = ();
 
-    fn handle(&mut self, msg: WriteTransaction, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: WriteTransaction, _ctx: &mut  SyncContext<Self>) -> Self::Result {
         let transaction = msg.0;
         let message = format!("{},{}\n", transaction.id, transaction.precio);
-        self.file
-            .write_all(message.as_bytes())
-            .expect("Error escribiendo archivo de log");
+        self.file.write_all(message.as_bytes());
     }
 }

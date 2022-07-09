@@ -9,7 +9,7 @@ pub struct Logger {
 
 impl Logger {
     pub fn new(name: &str) -> Self {
-        let filename = format!("refactor/logs/{}.log", name);
+        let filename = format!("al-globo/logs/{}.log", name);
 
         let log_file = OpenOptions::new()
             .write(true)
