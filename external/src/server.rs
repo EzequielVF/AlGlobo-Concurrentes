@@ -18,10 +18,10 @@ pub enum TransactionStatus {
     Prepare,
     Commit,
     Abort,
-    Failed
+    Failed,
 }
 
-pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
+pub fn run(ip: &str, port: &str, nombre: &str, success_rate: u8) -> std::io::Result<()> {
     let address = format!("{}:{}", ip, port);
     let logger = Arc::new(Mutex::new(Logger::new(nombre)));
     {
@@ -31,23 +31,25 @@ pub fn run(ip: &str, port: &str, nombre: &str) -> std::io::Result<()> {
             .log(format!("Esperando clientes en: {}", address).as_str());
     }
     let transactions = Arc::new(RwLock::new(HashMap::<String, TransactionStatus>::new()));
+
     loop {
         let listener = TcpListener::bind(&address)?;
         let connection: (TcpStream, SocketAddr) = listener.accept()?;
         let mut client_stream = connection.0;
-        let transactions_aux = transactions.clone();
+        let transactions_clone = transactions.clone();
+
         let logger_clone = logger.clone();
         thread::Builder::new()
             .name("<<Cliente>>".into())
             .spawn(move || {
                 logger_clone.lock().unwrap().log("Se lanzó un cliente!");
-                read_packet_from_client(&mut client_stream, logger_clone, transactions_aux.clone());
+                read_packet_from_client(&mut client_stream, logger_clone, transactions_clone.clone(), success_rate);
             })
             .unwrap();
     }
 }
 
-fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>, transactions: Arc<RwLock<HashMap<String, TransactionStatus>>>) {
+fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>, transactions: Arc<RwLock<HashMap<String, TransactionStatus>>>, success_rate: u8) {
     loop {
         let mut num_buffer = [0u8; 2];
         match stream.read_exact(&mut num_buffer) {
@@ -61,8 +63,9 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>, t
                 match message_type {
                     Pay => {
                         let (id, precio) = read_pay(buffer_packet);
-                        logger.lock().unwrap().log(format!("Recibí una transacción de código {} y precio:{}, voy a procesarlo!", id, precio).as_str());
-                        if successful_payment() {
+                        logger.lock().unwrap().log(format!("Recibí una transacción de código {} y precio: {}, voy a procesarlo!", id, precio).as_str());
+
+                        if successful_payment(success_rate) {
                             logger.lock().unwrap().log(format!("La transacción id {} fue procesada exitosamente", id).as_str());
                             send_message(stream, id.clone(), true, logger.clone());
                             if let Ok(mut transactions) = transactions.write() {
@@ -75,7 +78,6 @@ fn read_packet_from_client(stream: &mut TcpStream, logger: Arc<Mutex<Logger>>, t
                             if let Ok(mut transactions) = transactions.write() {
                                 transactions.insert(id, TransactionStatus::Failed);
                             }
-
                         }
                     }
                     Commit => {
@@ -116,14 +118,12 @@ fn random_duration_processing() {
     thread::sleep(Duration::from_millis(ms * FACTOR_TEMPORAL));
 }
 
-fn successful_payment() -> bool {
-    const ERROR_THRESHOLD: i32 = 500;
-
+fn successful_payment(success_rate: u8) -> bool {
     random_duration_processing();
 
-    let random_value = thread_rng().gen_range(0, 1000);
+    let random_value = thread_rng().gen_range(0, 100);
 
-    random_value > ERROR_THRESHOLD
+    random_value < success_rate
 }
 
 #[doc(hidden)]
@@ -143,8 +143,8 @@ fn send_message(stream: &mut TcpStream, id: String, estado: bool, logger: Arc<Mu
             logger.lock().unwrap().log(format!("Se envió cabecera para id {} al cliente!", id).as_str());
         }
         Err(_) => {
-            logger.lock().unwrap().log((format!(
-                "Hubo un problema al intentar enviar cabecera para transacción de id {} al cliente!", id).as_str()));
+            logger.lock().unwrap().log(format!(
+                "Hubo un problema al intentar enviar cabecera para transacción de id {} al cliente!", id).as_str());
         }
     }
 
