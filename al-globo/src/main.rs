@@ -1,7 +1,7 @@
 use std::env::args;
 use std::net::{TcpStream, UdpSocket};
 use std::process::exit;
-use std::sync::{Arc, mpsc, Mutex};
+use std::sync::{Arc, Barrier, mpsc, Mutex};
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
@@ -11,13 +11,13 @@ use actix::SyncArbiter;
 
 use crate::communication::{connect_to_server, read_answer};
 use crate::config::read_config;
+use crate::leader::{id_to_dataaddr, LeaderElection, TIMEOUT};
 use crate::logger::{Log, Logger};
 use crate::reader::{Reader, ReadTransaction};
 use crate::sender::Sender;
 use crate::transaction_manager::{ProcessEntityAnswer, SendAddr, TransactionManager};
 use crate::types::{Answer, EntityAnswer, ServerResponse};
 use crate::writer::Writer;
-use crate::leader::{id_to_dataaddr, LeaderElection, TIMEOUT};
 
 mod communication;
 pub mod config;
@@ -68,14 +68,16 @@ async fn main() {
     }
 
     let my_id = argv[1].parse::<usize>().unwrap();
+    // Todo
     let flag = Arc::new(Mutex::new(false));
-    let mut leader_election = LeaderElection::new(my_id, flag.clone());
+    let barrier = Arc::new(Barrier::new(2));
+    let mut leader_election = LeaderElection::new(my_id, flag.clone(), barrier.clone());
     let socket = UdpSocket::bind(id_to_dataaddr(my_id)).unwrap();
     let mut buf = [0; 4];
 
     loop {
         {
-            *flag.lock().unwrap() = false;
+            *flag.lock().unwrap() = false; //revisar
         }
         if leader_election.am_i_leader() {
             println!("Líder arranca ejecución");
@@ -188,7 +190,8 @@ async fn main() {
             let transactions_file = config["alglobo"]["transactions_hash_file"].as_str().unwrap();
             let transaction_manager = SyncArbiter::start(1, move ||
                 TransactionManager::new(transaction_manager_logger.clone(),
-                                        writer.clone(), answers_writer.clone(), answers_file, transactions_writer.clone(), transactions_file));
+                                        writer.clone(), answers_writer.clone(),
+                                        answers_file, transactions_writer.clone(), transactions_file));
             airline_s.send(transaction_manager.clone());
             bank_s.send(transaction_manager.clone());
             hotel_s.send(transaction_manager.clone());
@@ -202,7 +205,7 @@ async fn main() {
                             transaction_manager.clone(),
                             reader_logger.clone()));
 
-            reader.do_send(ReadTransaction());
+            reader.send(ReadTransaction()).await;
             let flag_aux = flag.clone();
             let socket_aux = socket.try_clone().unwrap();
             thread::spawn(move || {
@@ -217,11 +220,11 @@ async fn main() {
                         .expect("socket send, problema al enviar en PONG");
                 }
             });
-
             // This made it worked
             tokio::signal::ctrl_c().await.unwrap();
             println!("Ctrl-C received, shutting down");
-            System::current().stop();
+            //barrier.wait();
+            //System::current().stop();
 
             break;
         } else {

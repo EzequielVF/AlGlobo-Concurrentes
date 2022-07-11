@@ -22,7 +22,6 @@ impl Writer {
         let file = OpenOptions::new()
             .write(true)
             .create(true)
-            .truncate(true)
             .open(path)
             .expect("Error creando archivo de escritura");
 

@@ -1,8 +1,9 @@
 use std::mem::size_of;
 use std::net::UdpSocket;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Barrier, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
+use actix_rt::System;
 
 const REPLICAS: usize = 3;
 pub const TIMEOUT: Duration = Duration::from_secs(10);
@@ -22,16 +23,18 @@ pub struct LeaderElection {
     leader_id: Arc<(Mutex<Option<usize>>, Condvar)>,
     got_ok: Arc<(Mutex<bool>, Condvar)>,
     stop: Arc<(Mutex<bool>, Condvar)>,
+    barrier: Arc<Barrier>
 }
 
 impl LeaderElection {
-    pub(crate) fn new(id: usize, flag: Arc<Mutex<bool>>) -> LeaderElection {
+    pub(crate) fn new(id: usize, flag: Arc<Mutex<bool>>, barrier: Arc<Barrier>) -> LeaderElection {
         let mut ret = LeaderElection {
             id,
             socket: UdpSocket::bind(id_to_ctrladdr(id)).unwrap(),
             leader_id: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             got_ok: Arc::new((Mutex::new(false), Condvar::new())),
             stop: Arc::new((Mutex::new(false), Condvar::new())),
+            barrier
         };
 
         let mut clone = ret.clone();
@@ -157,6 +160,11 @@ impl LeaderElection {
                     println!("[{}] recibí nuevo coordinador {}", self.id, id_from);
                     let mut aux = flag.lock().unwrap();
                     *aux = true;
+                     if self.am_i_leader(){
+                         System::current().stop();
+                         println!("""""""""""""""e");
+                     }
+                    //self.barrier.wait();
                     *self.leader_id.0.lock().unwrap() = Some(id_from);
                     self.leader_id.1.notify_all();
                 }
@@ -186,6 +194,7 @@ impl LeaderElection {
             leader_id: self.leader_id.clone(),
             got_ok: self.got_ok.clone(),
             stop: self.stop.clone(),
+            barrier: self.barrier.clone()
         }
     }
 }
