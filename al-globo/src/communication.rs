@@ -1,6 +1,5 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 
@@ -12,7 +11,9 @@ pub fn connect_to_server(config: &Value, entity_name: &str) -> Result<TcpStream,
     let ip = &ip[1..ip.len()-1];
     let port = config[entity_name]["port"].to_string();
     let address = format!("{}:{}", ip, port);
-    println!("La address es:{}", address);
+
+    println!("La address de {} es: {}", entity_name, address);
+
     TcpStream::connect(address)
 }
 
@@ -106,9 +107,7 @@ pub fn read_answer(mut stream: TcpStream) -> ServerResponse {
 
     let mut buffer_packet: Vec<u8> = vec![0; size as usize];
     let _bytes_read = stream.read_exact(&mut buffer_packet);
-    let mut aux = String::new();
-
-    aux = read(buffer_packet);
+    let aux = read(buffer_packet);
     let mut response = ServerResponse {
         transaction_id: aux,
         response: false,
@@ -120,7 +119,7 @@ pub fn read_answer(mut stream: TcpStream) -> ServerResponse {
         }
         _ => {}
     }
-    return response;
+    response
 }
 
 fn bytes2string(bytes: &[u8]) -> Result<String, u8> {
@@ -136,5 +135,10 @@ fn read(buffer_packet: Vec<u8>) -> String {
     let pago_size: usize = buffer_packet[(_index) as usize] as usize; // esto es asi porque los string en su primer byte tiene el tamaño, seguido del contenido
     _index += 1;
 
-    bytes2string(&buffer_packet[_index..(_index + pago_size)]).unwrap()
+    //bytes2string(&buffer_packet[_index..(_index + pago_size)]).unwrap();
+
+    match bytes2string(&buffer_packet[_index..(_index + pago_size)]) {
+        Ok(message) => { message }
+        Err(_) => { "INDEFINIDO".to_string() }
+    }
 }

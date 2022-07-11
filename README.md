@@ -2,33 +2,23 @@
 
 ## AlGlobo
 
+### Ejecución 
+
+
+```shell
+$ cargo run --bin al-globo <id-replica>
+```
+
+
+
 ```sh
 $ ./al-globo <configuracion.json>
 ```
 
-### Ejemplo Archivo Configuración
+## Servicios
 
-```json
-{
-    "external_entities": [
-        {
-            "name": "AIRLINE",
-            "ip": "127.0.0.1",
-            "port": "3000"
-        },
-        {
-            "name": "BANK",
-            "ip": "127.0.0.1",
-            "port": "3001"
-        },
-        {
-            "name": "HOTEL",
-            "ip": "127.0.0.1",
-            "port": "3002"
-        }
-    ],
-    "log_file": "payment-processor",
-    "payment_transactions": "archivo.csv",
-    "failed_transactions": "failed-transactions.csv"
-}
+### Ejecución
+
+```shell
+$ cargo run --bin service 127.0.0.1 <port> <{{airline|bank|hotel}}> <tasa-exito>
 ```

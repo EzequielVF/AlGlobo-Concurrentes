@@ -1,5 +1,4 @@
 use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
 use actix::{Actor, Addr, Handler, Message, SyncContext};
 
 use crate::{Logger};
@@ -20,7 +19,7 @@ impl Actor for Sender {
 impl Sender {
     pub fn new(name: String,socket: TcpStream,logger: Addr<Logger>) -> Self {
         Sender {
-            name: name.to_string(),
+            name,
             stream : socket,
             logger}
     }
@@ -36,10 +35,19 @@ impl Handler<SendTransaction> for Sender {
 
     fn handle(&mut self,msg: SendTransaction, _ctx: &mut SyncContext<Self>) -> Self::Result {
         let transaction = msg.0;
-        let mut channel = self.stream.try_clone().unwrap();
-        self.logger.do_send(Log(
+       /* let mut channel = self.stream.try_clone().expect("No pude clonar el stream para pasarlo!");
+        self.logger.do_send(Log("SENDER".to_string(),
             format!("Se envía transacción de id {} al servidor  [{}]",transaction.id, self.name)));
-            send_package(&mut channel, transaction.clone(), &self.name);
+            send_package(&mut channel, transaction.clone(), &self.name);*/
+        match &mut self.stream.try_clone() {
+            Ok(channel) => {
+                self.logger.do_send(Log("SENDER".to_string(), format!("Se envía transacción de id {} al servidor  [{}]",transaction.id, self.name)));
+                send_package(channel, transaction, &self.name);
+            }
+            Err(_) => {
+                self.logger.do_send(Log("SENDER".to_string(), "No pude clonar el socket!".to_string()));
+            }
+        }
     }
 }
 
@@ -61,9 +69,21 @@ impl Handler<SendConfirmationOrRollback> for Sender {
             message = "rollback";
         }
 
-        let mut channel = self.stream.try_clone().unwrap();
-        send_transaction_result(&mut channel, transaction_result.clone());
-        self.logger.do_send(Log(format!("Se envía mensage {} para transacción {} al servidor [{}]",
-                    message, transaction_result.transaction_id, self.name)));
+        //let mut channel = self.stream.try_clone().expect("No pude clonar el stream para pasarlo!");
+
+        match &mut self.stream.try_clone() {
+            Ok(channel) => {
+                send_transaction_result(channel, transaction_result.clone());
+                self.logger.do_send(Log("SENDER".to_string(), format!("Se envía mensaje {} para transacción {} al servidor [{}]",
+                                                message, transaction_result.transaction_id, self.name)));
+            }
+            Err(_) => {
+                self.logger.do_send(Log("SENDER".to_string(), "No pude clonar el socket!".to_string()));
             }
         }
+        /*send_transaction_result(&mut channel, transaction_result.clone());
+        self.logger.do_send(Log("SENDER".to_string(), format!("Se envía mensaje {} para transacción {} al servidor [{}]", message, transaction_result.transaction_id, self.name))); }
+        */
+    }
+}
+

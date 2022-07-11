@@ -26,6 +26,8 @@
     "log_file": "logs/alglobo.log",
     "transactions_file": "transactions/transactions.csv",
     "operations_file":"" ,
-    "writer_file": "fails/fails.log"
+    "fails_file": "fails/fails.log",
+    "answers_file": "status/answers.json",
+    "transactions_hash_file": "status/transactions_hash.json"
   }
 }

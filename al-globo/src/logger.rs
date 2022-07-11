@@ -17,7 +17,7 @@ impl Logger {
         let log_file = OpenOptions::new()
             .write(true)
             .create(true)
-            .truncate(true)
+            .append(true)
             .open(path)
             .expect("Error creando archivo de log");
         Logger { file: log_file }
@@ -27,16 +27,16 @@ impl Logger {
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Log(pub String);
+pub struct Log(pub String, pub String);
 
 impl Handler<Log> for Logger {
     type Result = ();
     fn handle(&mut self, msg: Log, _ctx: &mut SyncContext<Self>) -> Self::Result {
-        let message = msg.0;
+        let Log (entity, message) = msg;
         let time = Local::now().to_string();
-        let log = format!("[{}] - {}\n", time, message);
+        let log = format!("[{}] - [{}] - {}\n", time, entity, message);
 
         print!("{}", log);
-        self.file.write_all(log.as_bytes()) .expect("Error escribiendo archivo de log");
+        self.file.write_all(log.as_bytes()).expect("Error escribiendo archivo de log");
     }
 }

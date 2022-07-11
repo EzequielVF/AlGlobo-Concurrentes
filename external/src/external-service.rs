@@ -19,8 +19,19 @@ impl ServiceConfiguration {
 
         if args.len() != EXPECTED_ARGUMENTS {
             eprintln!("Argumentos insuficientes!");
-            eprintln!("Uso: <ip> <puerto> <nombre-servicio> <tasa-exito>");
+            eprintln!("Uso: <ip> <puerto> <{{airline|bank|hotel}}> <tasa-exito>");
             exit(1);
+        }
+
+        let service_name: String;
+        match args[3].as_str() {
+            "airline" | "bank" | "hotel" => {
+                service_name = String::from(&args[3]);
+            }
+            _ => {
+                eprintln!("<nombre-servicio> debe ser {{airline|bank|hotel}}");
+                exit(2);
+            }
         }
 
         let success_rate: u8;
@@ -33,15 +44,15 @@ impl ServiceConfiguration {
                 success_rate = rate;
             }
             Err(e) => {
-                eprintln!("Falló parseo de tasa-exito: {}", e.to_string());
-                exit(3);
+                eprintln!("Falló parseo de tasa-exito: {}", e);
+                exit(2);
             }
         }
 
         ServiceConfiguration {
             ip: String::from(&args[1]),
             port: String::from(&args[2]),
-            service_name: String::from(&args[3]),
+            service_name,
             success_rate,
         }
     }

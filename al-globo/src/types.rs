@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 use crate::communication::{Commit, Error, Pay, Rollback, Successful, Unknown};
 
 pub const ERROR: u8 = 1;
 
 /// Estado de _request_ enviado a servicio externo
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Answer {
     /// Solicitud enviada
     Pending,
@@ -16,7 +18,7 @@ pub enum Answer {
 //type TransactionAnswers = HashMap<String, Answer>;
 
 /// Representación del paquete turístico a procesar
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Transaction {
     /// id único de la transacción
     pub id: String,
@@ -80,3 +82,5 @@ impl From<Type> for u8 {
         }
     }
 }
+
+pub type TransactionsAnswers = HashMap<String, HashMap<String, Answer>>;

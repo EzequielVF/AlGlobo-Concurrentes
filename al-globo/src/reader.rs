@@ -1,11 +1,14 @@
-use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, SyncContext};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader};
+use std::thread;
+use std::time::Duration;
 
-use crate::logger::Log;
-use crate::types::Transaction;
+use actix::{Actor, Addr, Handler, Message, SyncContext};
+
 use crate::{Logger, TransactionManager};
+use crate::logger::Log;
 use crate::transaction_manager::SendTransactionToEntities;
+use crate::types::Transaction;
 
 pub struct Reader {
     file: BufReader<File>,
@@ -52,8 +55,7 @@ pub struct ReadTransaction();
 impl Handler<ReadTransaction> for Reader {
     type Result = ();
 
-    fn handle(&mut self,_msg: ReadTransaction,ctx: &mut <Reader as Actor>::Context) -> Self::Result {
-        
+    fn handle(&mut self, _msg: ReadTransaction, ctx: &mut <Reader as Actor>::Context) -> Self::Result {
         let mut buffer = String::from("");
 
         if let Ok(line) = self.file.read_line(&mut buffer) {
@@ -63,9 +65,11 @@ impl Handler<ReadTransaction> for Reader {
                     id: splitted_line[0].to_string(),
                     precio: splitted_line[1].to_string(),
                 };
-                self.logger.do_send(Log(format!("Se leyó paquete con id {} - y precio: {}",
-                    splitted_line[0], splitted_line[1])));
+                self.logger.do_send(Log("READER".to_string(), format!("Se leyó paquete con id {} - y precio: {}",
+                                                                      splitted_line[0], splitted_line[1])));
                 self.transaction_manager.do_send(SendTransactionToEntities(transaction));
+
+                thread::sleep(Duration::from_secs(3));
                 ctx.address().do_send(ReadTransaction());
             }
         }
