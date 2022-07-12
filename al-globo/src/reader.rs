@@ -14,16 +14,20 @@ pub struct Reader {
     file: BufReader<File>,
     transaction_manager: Addr<TransactionManager>,
     logger: Addr<Logger>,
+    keep_running: bool,
 }
 
 impl Reader {
     pub fn new(path: &str, transaction_manager: Addr<TransactionManager>, logger: Addr<Logger>) -> Self {
         let file = open_file(path);
+        let keep_running = true;
+
         match file {
             Ok(f) => Reader {
                 file: f,
                 transaction_manager,
                 logger,
+                keep_running
             },
             Err(_) => {
                 let file = OpenOptions::new()
@@ -37,6 +41,7 @@ impl Reader {
                     file: reader,
                     transaction_manager,
                     logger,
+                    keep_running
                 }
             }
         }
@@ -60,19 +65,50 @@ impl Handler<ReadTransaction> for Reader {
 
         if let Ok(line) = self.file.read_line(&mut buffer) {
             if line > 0 {
-                let splitted_line: Vec<&str> = buffer.split(',').collect();
+                let split_line: Vec<&str> = buffer.split(',').collect();
                 let transaction = Transaction {
-                    id: splitted_line[0].to_string(),
-                    precio: splitted_line[1].to_string(),
+                    id: split_line[0].to_string(),
+                    precio: split_line[1].to_string(),
                 };
                 self.logger.do_send(Log("READER".to_string(), format!("Se leyó paquete con id {} - y precio: {}",
-                                                                      splitted_line[0], splitted_line[1])));
+                                                                      split_line[0], split_line[1])));
                 self.transaction_manager.do_send(SendTransactionToEntities(transaction));
 
                 thread::sleep(Duration::from_secs(3));
-                ctx.address().do_send(ReadTransaction());
+
+                self.logger.do_send(Log("[READER]".to_string(), format!("keep running: {}", self.keep_running)));
+                if self.keep_running {
+                    ctx.address().do_send(ReadTransaction());
+                }
             }
         }
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct StopReading();
+
+impl Handler<StopReading> for Reader {
+    type Result = ();
+
+    fn handle(&mut self, _msg: StopReading, _ctx: &mut <Reader as Actor>::Context) -> Self::Result {
+        self.logger.do_send(Log("[READER]".to_string(), format!("~~~~~~~~~ Oh no! Me están stoppeando!")));
+        self.keep_running = false;
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct StartReading();
+
+impl Handler<StartReading> for Reader {
+    type Result = ();
+
+    fn handle(&mut self, _msg: StartReading, ctx: &mut <Reader as Actor>::Context) -> Self::Result {
+        self.logger.do_send(Log("[READER]".to_string(), format!("~~~~~~~~~ Leyendo de nuevooooooooooo!11111!!")));
+        self.keep_running = true;
+        ctx.address().do_send(ReadTransaction());
     }
 }
 

@@ -67,149 +67,149 @@ async fn main() {
         exit(1);
     }
 
+    println!("Líder arranca ejecución");
+
+    // Get configuration
+    let config = Box::leak(Box::new(read_config("al-globo/src/config.json")));
+
+    // Start Logger
+    let path = config["alglobo"]["log_file"].as_str().unwrap();
+    let logger = SyncArbiter::start(1, move || Logger::new(path));
+
+    logger.do_send(Log("main".to_string(), "****************************".to_string()));
+    logger.do_send(Log("main".to_string(), "Está escribiendo una réplica".to_string()));
+    logger.do_send(Log("main".to_string(), "****************************".to_string()));
+
+    // Create Streams
+    let airline_stream = connect_to_server(config, "airline");
+    let bank_stream = connect_to_server(config, "bank");
+    let hotel_stream = connect_to_server(config, "hotel");
+
+    let airline_sender;
+    let (airline_s, airline_rec) = mpsc::channel();
+    //let (airline_s, airline_rec) = mpsc::channel();
+    match airline_stream {
+        Ok(stream) => {
+            logger.do_send(Log("main".to_string(), "¡Me pude conectar con la aerolínea!".to_string()));
+            //let socket = Arc::new(Mutex::new(stream));
+            let airline_logger = logger.clone();
+            let socket = stream.try_clone().unwrap();
+            let sender_addr = SyncArbiter::start(1, move ||
+                Sender::new("airline".to_string(),
+                            socket.try_clone().unwrap(),
+                            airline_logger.clone()));
+            airline_sender = Some(sender_addr);
+            let mut socket_aux = stream.try_clone().unwrap();
+            thread::spawn(move || receiver(&mut socket_aux, airline_rec, "airline".to_string()));
+        }
+        Err(_) => {
+            logger.do_send(Log("main".to_string(), "[main] ¡No Me pude conectar con la aerolínea!".to_string()));
+            airline_sender = None;
+        }
+    }
+
+    let bank_sender;
+    let (bank_s, bank_rec) = mpsc::channel();
+    match bank_stream {
+        Ok(stream) => {
+            logger.do_send(Log("main".to_string(), "Me pude conectar con el Banco!".to_string()));
+
+            let socket = stream.try_clone().unwrap();
+            let bank_logger = logger.clone();
+            let sender_address = SyncArbiter::start(1, move ||
+                Sender::new("bank".to_string(),
+                            socket.try_clone().unwrap(),
+                            bank_logger.clone()));
+            bank_sender = Some(sender_address);
+            let mut socket_clone = stream.try_clone().unwrap();
+
+            thread::spawn(move || receiver(&mut socket_clone, bank_rec, "bank".to_string()));
+        }
+        Err(_) => {
+            logger.do_send(Log("main".to_string(), "¡No me pude conectar con el Banco!".to_string()));
+            bank_sender = None;
+        }
+    }
+
+    let (hotel_s, hotel_rec) = mpsc::channel();
+    let hotel_sender;
+    match hotel_stream {
+        Ok(stream) => {
+            logger.do_send(Log("main".to_string(), "Me pude conectar con el Hotel!".to_string()));
+            let socket = stream.try_clone().unwrap();
+            let hotel_logger = logger.clone();
+            let aux = SyncArbiter::start(1, move ||
+                Sender::new("hotel".to_string(),
+                            socket.try_clone().unwrap(),
+                            hotel_logger.clone()));
+            hotel_sender = Some(aux);
+            let mut socket_aux = stream.try_clone().unwrap();
+            thread::spawn(move || receiver(&mut socket_aux, hotel_rec, "hotel".to_string()));
+        }
+        Err(_) => {
+            logger.do_send(Log("main".to_string(), "No me pude conectar con el Hotel!".to_string()));
+            hotel_sender = None;
+        }
+    }
+
+    // init Fails Writer
+    let fails_writer_file = config["alglobo"]["fails_file"].as_str().unwrap();
+    let fails_writer_logger = logger.clone();
+    let writer = SyncArbiter::start(1, move ||
+        Writer::new(fails_writer_file, fails_writer_logger.clone()));
+
+    // init answers Writer
+    let answers_file = config["alglobo"]["answers_file"].as_str().unwrap();
+    let answers_writer_logger = logger.clone();
+    let answers_writer = SyncArbiter::start(1, move ||
+        Writer::new(answers_file, answers_writer_logger.clone()));
+
+    // init transactions Writer
+    let transactions_file = config["alglobo"]["transactions_hash_file"].as_str().unwrap();
+    let transactions_writer_logger = logger.clone();
+    let transactions_writer = SyncArbiter::start(1, move ||
+        Writer::new(transactions_file, transactions_writer_logger.clone()));
+
+    // init transaction manager
+    let transaction_manager_logger = logger.clone();
+
+    let answers_file = config["alglobo"]["answers_file"].as_str().unwrap();
+    let transactions_file = config["alglobo"]["transactions_hash_file"].as_str().unwrap();
+    let transaction_manager = SyncArbiter::start(1, move ||
+        TransactionManager::new(transaction_manager_logger.clone(),
+                                writer.clone(), answers_writer.clone(),
+                                answers_file, transactions_writer.clone(), transactions_file));
+    airline_s.send(transaction_manager.clone());
+    bank_s.send(transaction_manager.clone());
+    hotel_s.send(transaction_manager.clone());
+    transaction_manager.do_send(SendAddr(airline_sender, hotel_sender, bank_sender));
+
+    // init reader
+    let transactions_file = config["alglobo"]["transactions_file"].as_str().expect("No encontre archivo de configuración!");
+    let reader_logger = logger.clone();
+    let reader = SyncArbiter::start(1, move ||
+        Reader::new(transactions_file,
+                    transaction_manager.clone(),
+                    reader_logger.clone()));
+
     let my_id = argv[1].parse::<usize>().unwrap();
     // Todo
-    let flag = Arc::new(Mutex::new(false));
-    let barrier = Arc::new(Barrier::new(2));
-    let mut leader_election = LeaderElection::new(my_id, flag.clone(), barrier.clone());
+    //let flag = Arc::new(Mutex::new(false));
+    let mut leader_election = LeaderElection::new(my_id, reader.clone());
     let socket = UdpSocket::bind(id_to_dataaddr(my_id)).unwrap();
     let mut buf = [0; 4];
 
     loop {
-        {
+        /*{
             *flag.lock().unwrap() = false; //revisar
-        }
+        }*/
         if leader_election.am_i_leader() {
-            println!("Líder arranca ejecución");
-
-            // Get configuration
-            let config = Box::leak(Box::new(read_config("al-globo/src/config.json")));
-
-            // Start Logger
-            let path = config["alglobo"]["log_file"].as_str().unwrap();
-            let logger = SyncArbiter::start(1, move || Logger::new(path));
-
-            logger.do_send(Log("main".to_string(), "****************************".to_string()));
-            logger.do_send(Log("main".to_string(), "Está escribiendo una réplica".to_string()));
-            logger.do_send(Log("main".to_string(), "****************************".to_string()));
-
-            // Create Streams
-            let airline_stream = connect_to_server(config, "airline");
-            let bank_stream = connect_to_server(config, "bank");
-            let hotel_stream = connect_to_server(config, "hotel");
-
-            let airline_sender;
-            let (airline_s, airline_rec) = mpsc::channel();
-            //let (airline_s, airline_rec) = mpsc::channel();
-            match airline_stream {
-                Ok(stream) => {
-                    logger.do_send(Log("main".to_string(), "¡Me pude conectar con la aerolínea!".to_string()));
-                    //let socket = Arc::new(Mutex::new(stream));
-                    let airline_logger = logger.clone();
-                    let socket = stream.try_clone().unwrap();
-                    let sender_addr = SyncArbiter::start(1, move ||
-                        Sender::new("airline".to_string(),
-                                    socket.try_clone().unwrap(),
-                                    airline_logger.clone()));
-                    airline_sender = Some(sender_addr);
-                    let mut socket_aux = stream.try_clone().unwrap();
-                    thread::spawn(move || receiver(&mut socket_aux, airline_rec, "airline".to_string()));
-                }
-                Err(_) => {
-                    logger.do_send(Log("main".to_string(), "[main] ¡No Me pude conectar con la aerolínea!".to_string()));
-                    airline_sender = None;
-                }
-            }
-
-            let bank_sender;
-            let (bank_s, bank_rec) = mpsc::channel();
-            match bank_stream {
-                Ok(stream) => {
-                    logger.do_send(Log("main".to_string(), "Me pude conectar con el Banco!".to_string()));
-
-                    let socket = stream.try_clone().unwrap();
-                    let bank_logger = logger.clone();
-                    let sender_address = SyncArbiter::start(1, move ||
-                        Sender::new("bank".to_string(),
-                                    socket.try_clone().unwrap(),
-                                    bank_logger.clone()));
-                    bank_sender = Some(sender_address);
-                    let mut socket_clone = stream.try_clone().unwrap();
-
-                    thread::spawn(move || receiver(&mut socket_clone, bank_rec, "bank".to_string()));
-                }
-                Err(_) => {
-                    logger.do_send(Log("main".to_string(), "¡No me pude conectar con el Banco!".to_string()));
-                    bank_sender = None;
-                }
-            }
-
-            let (hotel_s, hotel_rec) = mpsc::channel();
-            let hotel_sender;
-            match hotel_stream {
-                Ok(stream) => {
-                    logger.do_send(Log("main".to_string(), "Me pude conectar con el Hotel!".to_string()));
-                    let socket = stream.try_clone().unwrap();
-                    let hotel_logger = logger.clone();
-                    let aux = SyncArbiter::start(1, move ||
-                        Sender::new("hotel".to_string(),
-                                    socket.try_clone().unwrap(),
-                                    hotel_logger.clone()));
-                    hotel_sender = Some(aux);
-                    let mut socket_aux = stream.try_clone().unwrap();
-                    thread::spawn(move || receiver(&mut socket_aux, hotel_rec, "hotel".to_string()));
-                }
-                Err(_) => {
-                    logger.do_send(Log("main".to_string(), "No me pude conectar con el Hotel!".to_string()));
-                    hotel_sender = None;
-                }
-            }
-
-            // init Fails Writer
-            let fails_writer_file = config["alglobo"]["fails_file"].as_str().unwrap();
-            let fails_writer_logger = logger.clone();
-            let writer = SyncArbiter::start(1, move ||
-                Writer::new(fails_writer_file, fails_writer_logger.clone()));
-
-            // init answers Writer
-            let answers_file = config["alglobo"]["answers_file"].as_str().unwrap();
-            let answers_writer_logger = logger.clone();
-            let answers_writer = SyncArbiter::start(1, move ||
-                Writer::new(answers_file, answers_writer_logger.clone()));
-
-            // init transactions Writer
-            let transactions_file = config["alglobo"]["transactions_hash_file"].as_str().unwrap();
-            let transactions_writer_logger = logger.clone();
-            let transactions_writer = SyncArbiter::start(1, move ||
-                Writer::new(transactions_file, transactions_writer_logger.clone()));
-
-            // init transaction manager
-            let transaction_manager_logger = logger.clone();
-
-            let answers_file = config["alglobo"]["answers_file"].as_str().unwrap();
-            let transactions_file = config["alglobo"]["transactions_hash_file"].as_str().unwrap();
-            let transaction_manager = SyncArbiter::start(1, move ||
-                TransactionManager::new(transaction_manager_logger.clone(),
-                                        writer.clone(), answers_writer.clone(),
-                                        answers_file, transactions_writer.clone(), transactions_file));
-            airline_s.send(transaction_manager.clone());
-            bank_s.send(transaction_manager.clone());
-            hotel_s.send(transaction_manager.clone());
-            transaction_manager.do_send(SendAddr(airline_sender, hotel_sender, bank_sender));
-
-            // init reader
-            let transactions_file = config["alglobo"]["transactions_file"].as_str().expect("No encontre archivo de configuración!");
-            let reader_logger = logger.clone();
-            let reader = SyncArbiter::start(1, move ||
-                Reader::new(transactions_file,
-                            transaction_manager.clone(),
-                            reader_logger.clone()));
-
             reader.send(ReadTransaction()).await;
-            let flag_aux = flag.clone();
+            //let flag_aux = flag.clone();
             let socket_aux = socket.try_clone().unwrap();
             thread::spawn(move || {
-                while !(*flag_aux.lock().unwrap()) {
+                //while !(*flag_aux.lock().unwrap()) {
+                loop {
                     socket_aux
                         .set_read_timeout(None)
                         .expect("socket timeout, problema!");

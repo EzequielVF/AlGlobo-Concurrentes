@@ -3,7 +3,11 @@ use std::net::UdpSocket;
 use std::sync::{Arc, Barrier, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
-use actix_rt::System;
+
+use actix::Addr;
+
+use crate::{Reader, ReadTransaction};
+use crate::reader::{StartReading, StopReading};
 
 const REPLICAS: usize = 3;
 pub const TIMEOUT: Duration = Duration::from_secs(10);
@@ -23,22 +27,22 @@ pub struct LeaderElection {
     leader_id: Arc<(Mutex<Option<usize>>, Condvar)>,
     got_ok: Arc<(Mutex<bool>, Condvar)>,
     stop: Arc<(Mutex<bool>, Condvar)>,
-    barrier: Arc<Barrier>
+    reader_addr: Addr<Reader>,
 }
 
 impl LeaderElection {
-    pub(crate) fn new(id: usize, flag: Arc<Mutex<bool>>, barrier: Arc<Barrier>) -> LeaderElection {
+    pub(crate) fn new(id: usize, reader_addr: Addr<Reader>) -> LeaderElection {
         let mut ret = LeaderElection {
             id,
             socket: UdpSocket::bind(id_to_ctrladdr(id)).unwrap(),
             leader_id: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             got_ok: Arc::new((Mutex::new(false), Condvar::new())),
             stop: Arc::new((Mutex::new(false), Condvar::new())),
-            barrier
+            reader_addr,
         };
 
         let mut clone = ret.clone();
-        thread::spawn(move || clone.responder(flag));
+        thread::spawn(move || clone.responder());
 
         ret.find_new();
         ret
@@ -87,10 +91,9 @@ impl LeaderElection {
             }
         }
         *self.leader_id.0.lock().unwrap() = Some(self.id);
-        println!(
-            "ahora soy el liderrr, {:?}",
-            *self.leader_id.0.lock().unwrap()
-        );
+
+        println!("ahora soy el liderrr, {:?}", *self.leader_id.0.lock().unwrap());
+        self.reader_addr.do_send(StartReading());
     }
 
     pub(crate) fn find_new(&mut self) {
@@ -132,7 +135,7 @@ impl LeaderElection {
         println!("termino find new, fin de funcion");
     }
 
-    fn responder(&mut self, flag: Arc<Mutex<bool>>) {
+    fn responder(&mut self) {
         while !*self.stop.0.lock().unwrap() {
             let mut buf = [0; size_of::<usize>() + 1];
             let (_size, _from) = self.socket.recv_from(&mut buf).unwrap();
@@ -158,13 +161,11 @@ impl LeaderElection {
                 }
                 b'C' => {
                     println!("[{}] recibí nuevo coordinador {}", self.id, id_from);
-                    let mut aux = flag.lock().unwrap();
-                    *aux = true;
-                     if self.am_i_leader(){
-                         System::current().stop();
-                         println!("""""""""""""""e");
-                     }
-                    //self.barrier.wait();
+                    /*let mut aux = flag.lock().unwrap();
+                    *aux = true;*/
+
+                    self.reader_addr.do_send(StopReading());
+
                     *self.leader_id.0.lock().unwrap() = Some(id_from);
                     self.leader_id.1.notify_all();
                 }
@@ -194,7 +195,7 @@ impl LeaderElection {
             leader_id: self.leader_id.clone(),
             got_ok: self.got_ok.clone(),
             stop: self.stop.clone(),
-            barrier: self.barrier.clone()
+            reader_addr: self.reader_addr.clone(),
         }
     }
 }
