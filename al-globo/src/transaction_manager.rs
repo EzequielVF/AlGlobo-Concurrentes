@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use actix::{Actor, Addr, Handler, Message, SyncContext};
 
-use crate::{Logger, Writer};
+use crate::{Logger, Stats, Writer};
 use crate::logger::Log;
 use crate::sender::{SendConfirmationOrRollback, Sender, SendTransaction};
+use crate::stats::StopTime;
 use crate::types::{Answer, EntityAnswer, Transaction, TransactionResult, TransactionsAnswers};
 use crate::writer::{WriteAnswers, WriteTransaction, WriteTransactions};
 
@@ -18,11 +19,12 @@ pub struct TransactionManager {
     transactions_writer: Addr<Writer>,
     answers: TransactionsAnswers,
     transactions: HashMap<String, Transaction>,
+    stats: Addr<Stats>
 }
 
 impl TransactionManager {
     pub fn new(logger: Addr<Logger>, fails_writer: Addr<Writer>, answers_writer: Addr<Writer>, answers_file: &str,
-               transactions_writer: Addr<Writer>, transactions_file: &str) -> Self {
+               transactions_writer: Addr<Writer>, transactions_file: &str, stats: Addr<Stats>) -> Self {
         let mut answers = HashMap::<String, HashMap<String, Answer>>::new();
         let mut transactions = HashMap::<String, Transaction>::new();
 
@@ -46,6 +48,7 @@ impl TransactionManager {
             answers,
             transactions_writer,
             transactions,
+            stats
         }
     }
 }
@@ -232,7 +235,8 @@ impl Handler<ProcessEntityAnswer> for TransactionManager {
                     };
                     self.logger.do_send(Log("TXN_MGR".to_string(), format!("Se envía mensaje de {} para la transaccion \
                     {} a entidad {} para procesamiento", message_type, entity_answer.transaction_id, entity_name)));
-                })
+                });
+                self.stats.do_send(StopTime(entity_answer.transaction_id));
             }
         }
 

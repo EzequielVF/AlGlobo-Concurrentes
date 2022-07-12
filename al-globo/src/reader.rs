@@ -5,8 +5,9 @@ use std::time::Duration;
 
 use actix::{Actor, Addr, Handler, Message, SyncContext};
 
-use crate::{Logger, TransactionManager};
+use crate::{Logger, Stats, TransactionManager};
 use crate::logger::Log;
+use crate::stats::StartTime;
 use crate::transaction_manager::SendTransactionToEntities;
 use crate::types::Transaction;
 
@@ -15,10 +16,11 @@ pub struct Reader {
     transaction_manager: Addr<TransactionManager>,
     logger: Addr<Logger>,
     keep_running: bool,
+    stats: Addr<Stats>
 }
 
 impl Reader {
-    pub fn new(path: &str, transaction_manager: Addr<TransactionManager>, logger: Addr<Logger>) -> Self {
+    pub fn new(path: &str, transaction_manager: Addr<TransactionManager>, logger: Addr<Logger>, stats: Addr<Stats>) -> Self {
         let file = open_file(path);
         let keep_running = true;
 
@@ -27,7 +29,8 @@ impl Reader {
                 file: f,
                 transaction_manager,
                 logger,
-                keep_running
+                keep_running,
+                stats
             },
             Err(_) => {
                 let file = OpenOptions::new()
@@ -41,7 +44,8 @@ impl Reader {
                     file: reader,
                     transaction_manager,
                     logger,
-                    keep_running
+                    keep_running,
+                    stats
                 }
             }
         }
@@ -72,8 +76,8 @@ impl Handler<ReadTransaction> for Reader {
                 };
                 self.logger.do_send(Log("READER".to_string(), format!("Se leyó paquete con id {} - y precio: {}",
                                                                       split_line[0], split_line[1])));
-                self.transaction_manager.do_send(SendTransactionToEntities(transaction));
-
+                self.transaction_manager.do_send(SendTransactionToEntities(transaction.clone()));
+                self.stats.do_send(StartTime(transaction.id.clone()));
                 thread::sleep(Duration::from_secs(3));
 
                 self.logger.do_send(Log("[READER]".to_string(), format!("keep running: {}", self.keep_running)));

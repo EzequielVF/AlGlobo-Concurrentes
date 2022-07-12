@@ -6,7 +6,6 @@ use actix::{Actor, Addr, Handler, Message, SyncContext};
 
 use crate::types::{Transaction};
 use crate::{Answer, Logger};
-use crate::logger::Log;
 
 pub struct Writer {
     file: File,

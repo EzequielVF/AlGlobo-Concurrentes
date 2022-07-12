@@ -1,7 +1,7 @@
 use std::env::args;
 use std::net::{TcpStream, UdpSocket};
 use std::process::exit;
-use std::sync::{Arc, Barrier, mpsc, Mutex};
+use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
@@ -15,6 +15,7 @@ use crate::leader::{id_to_dataaddr, LeaderElection, TIMEOUT};
 use crate::logger::{Log, Logger};
 use crate::reader::{Reader, ReadTransaction};
 use crate::sender::Sender;
+use crate::stats::Stats;
 use crate::transaction_manager::{ProcessEntityAnswer, SendAddr, TransactionManager};
 use crate::types::{Answer, EntityAnswer, ServerResponse};
 use crate::writer::Writer;
@@ -28,6 +29,7 @@ mod writer;
 mod types;
 mod reader;
 mod leader;
+mod stats;
 
 fn receiver(stream: &mut TcpStream, rec: Receiver<Addr<TransactionManager>>, name: String) {
     println!("¡Antes del recv!");
@@ -71,6 +73,9 @@ async fn main() {
 
     // Get configuration
     let config = Box::leak(Box::new(read_config("al-globo/src/config.json")));
+
+    // stats
+    let stats = SyncArbiter::start(1, move || Stats::new());
 
     // Start Logger
     let path = config["alglobo"]["log_file"].as_str().unwrap();
@@ -172,13 +177,14 @@ async fn main() {
 
     // init transaction manager
     let transaction_manager_logger = logger.clone();
+    let transaction_manager_stats = stats.clone();
 
     let answers_file = config["alglobo"]["answers_file"].as_str().unwrap();
     let transactions_file = config["alglobo"]["transactions_hash_file"].as_str().unwrap();
     let transaction_manager = SyncArbiter::start(1, move ||
         TransactionManager::new(transaction_manager_logger.clone(),
                                 writer.clone(), answers_writer.clone(),
-                                answers_file, transactions_writer.clone(), transactions_file));
+                                answers_file, transactions_writer.clone(), transactions_file, transaction_manager_stats.clone()));
     airline_s.send(transaction_manager.clone());
     bank_s.send(transaction_manager.clone());
     hotel_s.send(transaction_manager.clone());
@@ -187,10 +193,14 @@ async fn main() {
     // init reader
     let transactions_file = config["alglobo"]["transactions_file"].as_str().expect("No encontre archivo de configuración!");
     let reader_logger = logger.clone();
+    let reader_stats = stats.clone();
     let reader = SyncArbiter::start(1, move ||
         Reader::new(transactions_file,
                     transaction_manager.clone(),
-                    reader_logger.clone()));
+                    reader_logger.clone(),
+                    reader_stats.clone()
+        )
+    );
 
     let my_id = argv[1].parse::<usize>().unwrap();
     // Todo

@@ -1,12 +1,12 @@
 use std::mem::size_of;
 use std::net::UdpSocket;
-use std::sync::{Arc, Barrier, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use actix::Addr;
 
-use crate::{Reader, ReadTransaction};
+use crate::{Reader};
 use crate::reader::{StartReading, StopReading};
 
 const REPLICAS: usize = 3;
